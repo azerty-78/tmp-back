@@ -26,10 +26,33 @@ Ces scripts seront exécutés automatiquement au premier démarrage de MongoDB.
 
 ## Démarrage
 
-```bash
-# Démarrer MongoDB
-docker-compose up -d
+### Option 1 : Créer le réseau manuellement (Recommandé)
 
+```bash
+# 1. Créer le réseau Docker (une seule fois)
+# Linux/Mac
+./create-network.sh
+
+# Windows PowerShell
+.\create-network.ps1
+
+# 2. Démarrer MongoDB
+docker-compose up -d
+```
+
+### Option 2 : Créer le réseau avec Docker directement
+
+```bash
+# Créer le réseau (remplacez project-name par votre PROJECT_NAME)
+docker network create project-name-network
+
+# Puis démarrer MongoDB
+docker-compose up -d
+```
+
+### Commandes utiles
+
+```bash
 # Voir les logs
 docker-compose logs -f
 

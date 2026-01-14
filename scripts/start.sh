@@ -31,8 +31,20 @@ fi
 source setup-bd/.env
 source setup-api/.env
 
-echo "📦 Démarrage de MongoDB..."
+echo "📦 Création du réseau Docker (si nécessaire)..."
 cd setup-bd
+
+# Créer le réseau si il n'existe pas
+NETWORK_NAME="${PROJECT_NAME:-project-name}-network"
+if ! docker network ls | grep -q "$NETWORK_NAME"; then
+    echo "  🔧 Création du réseau $NETWORK_NAME..."
+    docker network create "$NETWORK_NAME"
+    echo "  ✅ Réseau créé"
+else
+    echo "  ✓ Réseau $NETWORK_NAME existe déjà"
+fi
+
+echo "📦 Démarrage de MongoDB..."
 docker-compose up -d
 
 # Attendre que MongoDB soit healthy
