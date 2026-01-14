@@ -1,8 +1,10 @@
 services:
   api:
-    # Utiliser l'image depuis Docker Hub (poussée par CI/CD)
-    # Remplacez ${PROJECT_NAME} par le nom de votre projet lors de la personnalisation
-    image: ${DOCKERHUB_USERNAME:-your-username}/${PROJECT_NAME:-project-name}-api:latest
+    # Construire l'image localement depuis le Dockerfile
+    build:
+      context: ../
+      dockerfile: setup-api/Dockerfile
+    image: ${PROJECT_NAME:-project-name}-api:latest
     container_name: ${PROJECT_NAME:-project-name}-api
     restart: unless-stopped
     ports:
