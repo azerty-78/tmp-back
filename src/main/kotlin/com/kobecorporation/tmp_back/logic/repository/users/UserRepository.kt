@@ -1,7 +1,7 @@
-package com.kobecorporation.tmp_back.domain.repository.users
+package com.kobecorporation.tmp_back.logic.repository.users
 
-import com.kobecorporation.tmp_back.domain.model.users.Role
-import com.kobecorporation.tmp_back.domain.model.users.User
+import com.kobecorporation.tmp_back.logic.model.users.Role
+import com.kobecorporation.tmp_back.logic.model.users.User
 import org.bson.types.ObjectId
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository
 import org.springframework.stereotype.Repository

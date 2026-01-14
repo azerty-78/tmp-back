@@ -1,8 +1,8 @@
 package com.kobecorporation.tmp_back.interaction.dto.users.response
 
-import com.kobecorporation.tmp_back.domain.model.users.Gender
-import com.kobecorporation.tmp_back.domain.model.users.Role
-import com.kobecorporation.tmp_back.domain.model.users.SocialLinks
+import com.kobecorporation.tmp_back.logic.model.users.Gender
+import com.kobecorporation.tmp_back.logic.model.users.Role
+import com.kobecorporation.tmp_back.logic.model.users.SocialLinks
 import java.time.Instant
 import java.time.LocalDate
 

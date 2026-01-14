@@ -1,4 +1,4 @@
-package com.kobecorporation.tmp_back.domain.model.users
+package com.kobecorporation.tmp_back.logic.model.users
 
 /**
  * Rôles de l'application avec hiérarchie de permissions

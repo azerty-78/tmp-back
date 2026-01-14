@@ -1,6 +1,6 @@
 package com.kobecorporation.tmp_back.interaction.mapper.users
 
-import com.kobecorporation.tmp_back.domain.model.users.User
+import com.kobecorporation.tmp_back.logic.model.users.User
 import com.kobecorporation.tmp_back.interaction.dto.users.response.UserResponse
 
 /**

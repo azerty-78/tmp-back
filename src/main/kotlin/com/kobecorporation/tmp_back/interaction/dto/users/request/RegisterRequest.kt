@@ -1,6 +1,6 @@
 package com.kobecorporation.tmp_back.interaction.dto.users.request
 
-import com.kobecorporation.tmp_back.domain.model.users.Gender
+import com.kobecorporation.tmp_back.logic.model.users.Gender
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
