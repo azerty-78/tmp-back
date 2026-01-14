@@ -7,15 +7,15 @@
 - [Présentation](#présentation)
 - [Fonctionnalités](#fonctionnalités)
 - [Prérequis](#prérequis)
-- [Installation et Configuration](#installation-et-configuration)
+- [Installation Rapide](#installation-rapide)
+- [Configuration](#configuration)
 - [Démarrage](#démarrage)
+- [Tests de l'API](#tests-de-lapi)
 - [Architecture](#architecture)
 - [Structure du Projet](#structure-du-projet)
-- [Configuration](#configuration)
-- [Utilisation](#utilisation)
-- [Documentation API](#documentation-api)
 - [Développement](#développement)
 - [Production](#production)
+- [Dépannage](#dépannage)
 
 ---
 
@@ -25,12 +25,11 @@ Ce template est conçu pour **accélérer le démarrage de nouveaux projets clie
 
 - ✅ **Spring Boot 4.0** avec **Kotlin 2.2**
 - ✅ **WebFlux Reactive** (non-bloquant)
-- ✅ **MongoDB** (Reactive)
-- ✅ **Spring Security** avec **JWT**
+- ✅ **MongoDB** (Reactive) avec authentification
+- ✅ **Spring Security** avec **JWT** (Access + Refresh Token)
 - ✅ **Docker & Docker Compose** (prêt pour la production)
 - ✅ **Gestion des fichiers** (images users/stock)
 - ✅ **4 rôles utilisateurs** : USER, EMPLOYE, ADMIN, ROOT_ADMIN
-- ✅ **Refresh Token** avec gestion de session
 - ✅ **CORS configuré**
 - ✅ **Swagger/OpenAPI** intégré
 
@@ -50,7 +49,7 @@ Ce template est conçu pour **accélérer le démarrage de nouveaux projets clie
 ### 👥 Gestion des Utilisateurs
 
 - **4 rôles hiérarchiques** :
-  - `USER` : Utilisateur public
+  - `USER` : Utilisateur public (accès sans authentification)
   - `EMPLOYE` : Employé (accès interface de management)
   - `ADMIN` : Administrateur (gestion des employés et contenu)
   - `ROOT_ADMIN` : Root Admin (accès complet système)
@@ -84,7 +83,7 @@ Ce template est conçu pour **accélérer le démarrage de nouveaux projets clie
 
 ---
 
-## 🚀 Installation et Configuration
+## 🚀 Installation Rapide
 
 ### 1. Cloner le projet
 
@@ -111,53 +110,53 @@ Le script vous demandera :
 - `APP_BASE_URL` : URL de votre API (ex: `http://localhost:8090`)
 - `APP_FRONTEND_URL` : URL de votre frontend (ex: `http://localhost:3000`)
 
-### 3. Configuration manuelle
+---
 
-Si vous préférez configurer manuellement :
+## ⚙️ Configuration
 
-#### a) Configuration Base de Données (`setup-bd/.env`)
+### Variables à Personnaliser (Minimum)
 
-```bash
-cd setup-bd
-# Le fichier .env devrait déjà exister, sinon créez-le
-```
+#### Base de Données (`setup-bd/.env`)
 
-Modifiez uniquement :
-- `PROJECT_NAME=project-name` → Votre nom de projet
-- `MONGO_DATABASE=project-name` → Votre nom de base de données
-
-#### b) Configuration API (`setup-api/.env`)
-
-```bash
-cd setup-api
-```
-
-Modifiez :
-- `PROJECT_NAME` : **Même nom que dans setup-bd**
-- `SPRING_DATA_MONGODB_URI` : Remplacez `project-name` par votre `PROJECT_NAME` (2 fois : conteneur et base)
-- `APP_BASE_URL` : URL de votre API
-- `APP_FRONTEND_URL` : URL de votre frontend
-- `ALLOWED_ORIGINS` : Domaines autorisés pour CORS
-
-#### c) Configuration ROOT_ADMIN (`src/main/resources/application.properties`)
-
-Les valeurs par défaut sont déjà configurées. Pour les modifier :
-
-```properties
-admin.email=${ADMIN_EMAIL:bendjibril789@gmail.com}
-admin.password=${ADMIN_PASSWORD:Root@dmin789!}
-admin.username=${ADMIN_USERNAME:azerty-78}
-admin.firstname=${ADMIN_FIRSTNAME:Ben}
-admin.lastname=${ADMIN_LASTNAME:Djibril}
-```
-
-Ou via variables d'environnement dans `setup-api/.env` :
 ```env
+PROJECT_NAME=project-name              # ⚠️ À modifier
+MONGO_DATABASE=project-name            # ⚠️ À modifier
+MONGO_ROOT_USERNAME=root               # Déjà configuré
+MONGO_ROOT_PASSWORD=qwerty87           # Déjà configuré
+MONGO_PORT=27017                       # Déjà configuré
+```
+
+#### API (`setup-api/.env`)
+
+```env
+# ⚠️ À modifier
+PROJECT_NAME=project-name
+APP_BASE_URL=http://localhost:8090
+APP_FRONTEND_URL=http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5174
+
+# ⚠️ À modifier : Remplacez "project-name" par votre PROJECT_NAME (2 fois)
+SPRING_DATA_MONGODB_URI=mongodb://root:qwerty87@project-name-mongodb:27017/project-name?authSource=admin
+
+# Optionnel (valeurs par défaut fonctionnelles)
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-256-bits
 ADMIN_EMAIL=bendjibril789@gmail.com
 ADMIN_PASSWORD=Root@dmin789!
 ADMIN_USERNAME=azerty-78
-ADMIN_FIRSTNAME=Ben
-ADMIN_LASTNAME=Djibril
+```
+
+**⚠️ Important** : `PROJECT_NAME` doit être **identique** dans `setup-bd/.env` et `setup-api/.env`
+
+### Profils Spring Boot
+
+- **`default`** : Configuration locale (port 8090)
+- **`ngrok`** : Configuration pour tests avec ngrok
+- **`prod`** : Configuration production (Docker)
+
+Pour utiliser un profil :
+
+```bash
+./gradlew bootRun -Dspring.profiles.active=ngrok
 ```
 
 ---
@@ -212,12 +211,121 @@ Une fois démarré, vérifiez que tout fonctionne :
 # Vérifier les conteneurs
 docker ps
 
-# Vérifier les logs
-docker-compose -f setup-bd/docker-compose.yaml logs -f
-docker-compose -f setup-api/docker-compose.yaml logs -f
-
 # Tester l'API
 curl http://localhost:8090/actuator/health
+```
+
+**Réponse attendue** :
+```json
+{
+  "status": "UP",
+  "components": {
+    "mongo": {
+      "status": "UP",
+      "details": {
+        "databases": ["admin", "project-name", "config", "local"]
+      }
+    }
+  }
+}
+```
+
+---
+
+## 🧪 Tests de l'API
+
+### 1. Health Check
+
+```bash
+curl http://localhost:8090/actuator/health
+```
+
+### 2. Inscription
+
+```bash
+curl -X POST http://localhost:8090/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "Test123!",
+    "firstName": "Test",
+    "lastName": "User"
+  }'
+```
+
+**Réponse attendue** :
+```json
+{
+  "success": true,
+  "message": "Inscription réussie",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzM4NCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzM4NCJ9...",
+    "expiresIn": 3600,
+    "refreshExpiresIn": 604800,
+    "user": {
+      "id": "...",
+      "username": "testuser",
+      "email": "test@example.com",
+      "role": "USER"
+    }
+  }
+}
+```
+
+### 3. Connexion
+
+```bash
+curl -X POST http://localhost:8090/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "emailOrUsername": "test@example.com",
+    "password": "Test123!"
+  }'
+```
+
+### 4. Connexion ROOT_ADMIN
+
+Au premier démarrage, un compte ROOT_ADMIN est créé automatiquement :
+
+```bash
+curl -X POST http://localhost:8090/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "emailOrUsername": "bendjibril789@gmail.com",
+    "password": "Root@dmin789!"
+  }'
+```
+
+**Identifiants par défaut** :
+- **Email** : `bendjibril789@gmail.com`
+- **Password** : `Root@dmin789!`
+- **Username** : `azerty-78`
+
+### 5. Rafraîchissement de Token
+
+```bash
+curl -X POST http://localhost:8090/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "VOTRE_REFRESH_TOKEN_ICI"
+  }'
+```
+
+### 6. Utiliser un Token pour une Route Protégée
+
+```bash
+curl -X GET http://localhost:8090/api/users/me \
+  -H "Authorization: Bearer VOTRE_ACCESS_TOKEN_ICI"
+```
+
+### Documentation Swagger
+
+Une fois l'application démarrée, accédez à :
+
+```
+http://localhost:8090/swagger-ui.html
 ```
 
 ---
@@ -273,178 +381,49 @@ tmp-back/
 ├── src/main/kotlin/com/kobecorporation/tmp_back/
 │   ├── TmpBackApplication.kt          # Point d'entrée
 │   │
-│   ├── logic/                         # Couche logique métier
-│   │   ├── model/users/              # Modèles (User, Role, Gender, etc.)
-│   │   ├── repository/users/         # Repositories MongoDB (Reactive)
-│   │   └── service/users/            # Services métier (AuthService)
+│   ├── logic/                          # Couche logique métier
+│   │   ├── model/users/               # Modèles (User, Role, Gender)
+│   │   ├── repository/users/          # Repositories MongoDB (Reactive)
+│   │   └── service/users/             # Services métier (AuthService)
 │   │
-│   ├── interaction/                   # Couche d'interaction
-│   │   ├── dto/users/                # DTOs (Request/Response)
-│   │   ├── mapper/users/             # Mappers Entity ↔ DTO
-│   │   └── exception/                # Exceptions personnalisées
+│   ├── interaction/                    # Couche d'interaction
+│   │   ├── dto/users/                 # DTOs (Request/Response)
+│   │   ├── mapper/users/              # Mappers Entity ↔ DTO
+│   │   └── exception/                 # Exceptions personnalisées
 │   │
-│   ├── controller/users/              # Controllers REST
+│   ├── controller/users/               # Controllers REST
 │   │
-│   ├── configuration/                 # Configuration Spring
-│   │   ├── security/                 # Security, JWT
-│   │   └── fileStorage/               # Configuration stockage fichiers
+│   ├── configuration/                  # Configuration Spring
+│   │   ├── security/                  # Security, JWT
+│   │   ├── fileStorage/                # Configuration stockage fichiers
+│   │   └── MongoConfig.kt              # Configuration MongoDB
 │   │
-│   └── util/                          # Utilitaires
+│   └── util/                           # Utilitaires
 │
 ├── src/main/resources/
-│   ├── application.properties         # Configuration par défaut
-│   ├── application-ngrok.properties  # Configuration ngrok
-│   └── application-prod.properties    # Configuration production
+│   ├── application.properties          # Configuration par défaut
+│   ├── application-ngrok.properties    # Configuration ngrok
+│   └── application-prod.properties     # Configuration production
 │
-├── setup-bd/                          # Configuration MongoDB Docker
+├── setup-bd/                           # Configuration MongoDB Docker
 │   ├── docker-compose.yaml
-│   └── .env
+│   ├── .env
+│   └── init-scripts/
+│       └── 01-init-database.js         # Script d'initialisation DB
 │
-├── setup-api/                         # Configuration API Docker
+├── setup-api/                          # Configuration API Docker
 │   ├── docker-compose.yaml
 │   ├── Dockerfile
 │   └── .env
 │
-├── scripts/                          # Scripts d'automatisation
+├── scripts/                            # Scripts d'automatisation
 │   ├── init-project.sh / .ps1         # Initialisation projet
-│   ├── start.sh / .ps1                # Démarrage services
-│   └── stop.sh / .ps1                 # Arrêt services
+│   ├── start.sh / .ps1                 # Démarrage services
+│   └── stop.sh / .ps1                  # Arrêt services
 │
-├── Makefile                           # Commandes simplifiées
-├── build.gradle.kts                   # Dépendances Gradle
-└── README.md                          # Ce fichier
-```
-
-Pour plus de détails, consultez [`PROJECT-STRUCTURE.md`](./PROJECT-STRUCTURE.md).
-
----
-
-## ⚙️ Configuration
-
-### Variables d'Environnement Principales
-
-#### Base de Données (`setup-bd/.env`)
-
-```env
-PROJECT_NAME=project-name              # Nom du projet
-MONGO_DATABASE=project-name            # Nom de la base de données
-MONGO_ROOT_USERNAME=root               # Utilisateur MongoDB
-MONGO_ROOT_PASSWORD=qwerty87            # Mot de passe MongoDB
-MONGO_PORT=27017                        # Port MongoDB
-```
-
-#### API (`setup-api/.env`)
-
-```env
-# Projet
-PROJECT_NAME=project-name
-DOCKERHUB_USERNAME=your-username
-
-# URLs
-APP_BASE_URL=http://localhost:8090
-APP_FRONTEND_URL=http://localhost:3000
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
-
-# MongoDB
-SPRING_DATA_MONGODB_URI=mongodb://root:qwerty87@project-name-mongodb:27017/project-name?authSource=admin
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-256-bits
-JWT_ACCESS_TOKEN_EXPIRATION=3600000      # 1 heure
-JWT_REFRESH_TOKEN_EXPIRATION=604800000   # 7 jours
-
-# Admin (ROOT_ADMIN)
-ADMIN_EMAIL=bendjibril789@gmail.com
-ADMIN_PASSWORD=Root@dmin789!
-ADMIN_USERNAME=azerty-78
-ADMIN_FIRSTNAME=Ben
-ADMIN_LASTNAME=Djibril
-```
-
-### Profils Spring Boot
-
-- **`default`** : Configuration locale (port 8090)
-- **`ngrok`** : Configuration pour tests avec ngrok
-- **`prod`** : Configuration production (Docker)
-
-Pour utiliser un profil :
-
-```bash
-./gradlew bootRun -Dspring.profiles.active=ngrok
-```
-
----
-
-## 🎮 Utilisation
-
-### Endpoints API Principaux
-
-#### Authentification
-
-```bash
-# Inscription
-POST /api/auth/register
-Content-Type: application/json
-{
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "SecurePass123!",
-  "firstName": "John",
-  "lastName": "Doe"
-}
-
-# Connexion
-POST /api/auth/login
-Content-Type: application/json
-{
-  "emailOrUsername": "john@example.com",
-  "password": "SecurePass123!",
-  "rememberMe": false
-}
-
-# Rafraîchissement de token
-POST /api/auth/refresh
-Content-Type: application/json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-
-# Déconnexion
-POST /api/auth/logout
-Authorization: Bearer <access_token>
-```
-
-### Connexion ROOT_ADMIN
-
-Au premier démarrage, un compte ROOT_ADMIN est créé automatiquement avec les identifiants configurés dans `application.properties` :
-
-- **Email** : `bendjibril789@gmail.com`
-- **Password** : `Root@dmin789!`
-- **Username** : `azerty-78`
-
-### Accès aux Fichiers
-
-Les fichiers uploadés sont accessibles via :
-
-```
-GET /uploads/users/<filename>      # Images de profil
-GET /uploads/stock/<filename>      # Images de produits
-```
-
----
-
-## 📚 Documentation API
-
-Une fois l'application démarrée, accédez à la documentation Swagger :
-
-```
-http://localhost:8090/swagger-ui.html
-```
-
-Ou l'API OpenAPI JSON :
-
-```
-http://localhost:8090/v3/api-docs
+├── Makefile                            # Commandes simplifiées
+├── build.gradle.kts                    # Dépendances Gradle
+└── README.md                           # Ce fichier
 ```
 
 ---
@@ -531,15 +510,6 @@ docker-compose up -d
 
 ---
 
-## 📖 Documentation Complémentaire
-
-- [`SETUP-TEMPLATE.md`](./SETUP-TEMPLATE.md) : Guide de personnalisation détaillé
-- [`PROJECT-STRUCTURE.md`](./PROJECT-STRUCTURE.md) : Structure du projet
-- [`setup-bd/README.md`](./setup-bd/README.md) : Configuration MongoDB
-- [`setup-api/README.md`](./setup-api/README.md) : Configuration API
-
----
-
 ## 🐛 Dépannage
 
 ### Le réseau Docker n'existe pas
@@ -568,6 +538,39 @@ Vérifiez que :
 1. MongoDB est démarré et healthy
 2. Le `SPRING_DATA_MONGODB_URI` dans `setup-api/.env` est correct
 3. Le nom du conteneur correspond à `PROJECT_NAME-mongodb`
+4. Les credentials sont corrects (`root:qwerty87`)
+
+### Erreur : "Command find requires authentication"
+
+**Solution** : Vérifiez que l'URI MongoDB contient les credentials :
+
+```properties
+spring.data.mongodb.uri=mongodb://root:qwerty87@localhost:27017/project-name?authSource=admin
+```
+
+### Erreur : "Connection refused"
+
+**Solution** : Vérifiez que MongoDB est démarré :
+
+```bash
+docker ps | grep mongodb
+```
+
+### La base de données n'existe pas
+
+La base de données est créée automatiquement au premier démarrage via le script `setup-bd/init-scripts/01-init-database.js`.
+
+Si elle n'existe pas, connectez-vous manuellement :
+
+```bash
+docker exec -it project-name-mongodb mongosh -u root -p qwerty87 --authenticationDatabase admin
+```
+
+Puis dans mongosh :
+```javascript
+use project-name
+db.createCollection("_init")
+```
 
 ---
 
@@ -578,12 +581,7 @@ Vérifiez que :
 - ⚠️ **Le ROOT_ADMIN** est créé uniquement si l'email n'existe pas déjà
 - ✅ **Le réseau Docker** est créé automatiquement par Docker Compose
 - ✅ **Les dossiers** `users/` et `stock/` sont créés automatiquement
-
----
-
-## 🤝 Support
-
-Pour toute question ou problème, consultez la documentation dans les dossiers `setup-*/README.md` ou les fichiers markdown à la racine.
+- ✅ **La base de données** est créée automatiquement au premier démarrage
 
 ---
 
