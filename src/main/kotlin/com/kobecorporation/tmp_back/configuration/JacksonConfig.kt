@@ -3,42 +3,27 @@ package com.kobecorporation.tmp_back.configuration
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.http.codec.ServerCodecConfigurer
-import org.springframework.http.codec.json.Jackson2JsonDecoder
-import org.springframework.http.codec.json.Jackson2JsonEncoder
-import org.springframework.web.reactive.config.WebFluxConfigurer
+import org.springframework.context.annotation.Primary
 
 /**
  * Configuration Jackson pour la sérialisation/désérialisation JSON
  * 
  * Gère les dates Java 8+ (LocalDate, Instant, etc.)
+ * 
+ * Note: Pour WebFlux, Spring Boot configure automatiquement Jackson
+ * via les propriétés dans application.properties
  */
 @Configuration
-class JacksonConfig : WebFluxConfigurer {
+class JacksonConfig {
 
     @Bean
-    fun jackson2ObjectMapperBuilderCustomizer(): Jackson2ObjectMapperBuilderCustomizer {
-        return Jackson2ObjectMapperBuilderCustomizer { builder ->
-            builder.modules(JavaTimeModule())
-            builder.featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        }
-    }
-
-    @Bean
+    @Primary
     fun objectMapper(): ObjectMapper {
-        return jacksonObjectMapper().apply {
+        return ObjectMapper().apply {
             registerModule(JavaTimeModule())
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         }
-    }
-
-    override fun configureHttpMessageCodecs(configurer: ServerCodecConfigurer) {
-        val mapper = objectMapper()
-        configurer.defaultCodecs().jackson2JsonEncoder(Jackson2JsonEncoder(mapper))
-        configurer.defaultCodecs().jackson2JsonDecoder(Jackson2JsonDecoder(mapper))
     }
 }
