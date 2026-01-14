@@ -19,33 +19,36 @@ src/main/kotlin/com/kobecorporation/tmp_back/
 │
 ├── domain/                          # Couche domaine (Business Logic)
 │   ├── model/                       # Data Models / Entities (MongoDB Documents)
-│   │   ├── User.kt                  # Modèle utilisateur
-│   │   └── ...
+│   │   └── users/                   # Modèles liés aux utilisateurs
+│   │       ├── User.kt              # Modèle utilisateur
+│   │       ├── Role.kt              # Enum des rôles
+│   │       ├── Gender.kt            # Enum du genre
+│   │       └── SocialLinks.kt       # Liens sociaux
 │   ├── repository/                  # MongoDB Repositories (Reactive)
-│   │   ├── UserRepository.kt       # Repository utilisateur
-│   │   └── ...
+│   │   └── users/                   # Repositories liés aux utilisateurs
+│   │       └── UserRepository.kt    # Repository utilisateur
 │   └── service/                     # Business Logic (Services métier)
-│       ├── AuthService.kt            # Service d'authentification
-│       ├── UserService.kt           # Service utilisateur
-│       └── ...
+│       └── users/                   # Services liés aux utilisateurs
+│           ├── AuthService.kt       # Service d'authentification
+│           └── UserService.kt       # Service utilisateur
 │
 ├── interaction/                     # Couche d'interaction (API)
 │   ├── controller/                  # REST Controllers (Endpoints API)
-│   │   ├── AuthController.kt        # Authentification (login, register)
-│   │   ├── UserController.kt        # Gestion des utilisateurs
-│   │   └── ...
+│   │   └── users/                   # Controllers liés aux utilisateurs
+│   │       ├── AuthController.kt    # Authentification (login, register)
+│   │       └── UserController.kt     # Gestion des utilisateurs
 │   ├── dto/                         # Data Transfer Objects
-│   │   ├── request/                 # DTOs pour les requêtes
-│   │   │   ├── LoginRequest.kt
-│   │   │   ├── RegisterRequest.kt
-│   │   │   └── ...
-│   │   └── response/                # DTOs pour les réponses
-│   │       ├── AuthResponse.kt
-│   │       ├── UserResponse.kt
-│   │       └── ...
+│   │   └── users/                   # DTOs liés aux utilisateurs
+│   │       ├── request/             # DTOs pour les requêtes
+│   │       │   ├── LoginRequest.kt
+│   │       │   ├── RegisterRequest.kt
+│   │       │   └── RefreshTokenRequest.kt
+│   │       └── response/            # DTOs pour les réponses
+│   │           ├── AuthResponse.kt
+│   │           └── UserResponse.kt
 │   └── mapper/                      # Mappers (conversions Entity <-> DTO)
-│       ├── UserMapper.kt            # Mapper utilisateur
-│       └── ...
+│       └── users/                   # Mappers liés aux utilisateurs
+│           └── UserMapper.kt        # Mapper utilisateur
 │
 ├── exception/                       # Gestion des exceptions
 │   ├── GlobalExceptionHandler.kt    # Handler global des exceptions
