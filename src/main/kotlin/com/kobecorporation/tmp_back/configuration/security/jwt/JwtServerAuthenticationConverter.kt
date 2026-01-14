@@ -1,0 +1,32 @@
+package com.kobecorporation.tmp_back.configuration.security.jwt
+
+import org.springframework.http.HttpHeaders
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.Authentication
+import org.springframework.security.web.server.authentication.ServerAuthenticationConverter
+import org.springframework.stereotype.Component
+import org.springframework.web.server.ServerWebExchange
+import reactor.core.publisher.Mono
+
+/**
+ * Convertisseur qui extrait le token JWT depuis le header Authorization
+ * Format attendu : "Bearer <token>"
+ */
+@Component
+class JwtServerAuthenticationConverter : ServerAuthenticationConverter {
+
+    companion object {
+        private const val BEARER_PREFIX = "Bearer "
+    }
+
+    override fun convert(exchange: ServerWebExchange): Mono<Authentication> {
+        val authHeader = exchange.request.headers.getFirst(HttpHeaders.AUTHORIZATION)
+        
+        return if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            val token = authHeader.substring(BEARER_PREFIX.length)
+            Mono.just(UsernamePasswordAuthenticationToken(token, token))
+        } else {
+            Mono.empty()
+        }
+    }
+}
