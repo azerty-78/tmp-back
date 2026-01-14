@@ -21,7 +21,7 @@ import java.util.Base64
  */
 @Service
 class JwtService(
-    private val jwtProperties: JwtProperties
+    val jwtProperties: JwtProperties // Exposé pour AuthService
 ) {
     private val secretKey: SecretKey = Keys.hmacShaKeyFor(
         Base64.getDecoder().decode(jwtProperties.secret)
