@@ -26,27 +26,9 @@ $bdEnv = Get-Content "setup-bd\.env" | Where-Object { $_ -match "^[^#]" -and $_ 
 
 $projectName = ($bdEnv | Where-Object { $_.Key -eq "PROJECT_NAME" }).Value
 
-Write-Host "📦 Création du réseau Docker (si nécessaire)..." -ForegroundColor Yellow
-Set-Location setup-bd
-
-# Créer le réseau si il n'existe pas
-$NETWORK_NAME = "$projectName-network"
-$networkExists = docker network ls | Select-String "$NETWORK_NAME"
-if (-not $networkExists) {
-    Write-Host "  🔧 Création du réseau $NETWORK_NAME..." -ForegroundColor Cyan
-    docker network create "$NETWORK_NAME"
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  ✅ Réseau créé" -ForegroundColor Green
-    } else {
-        Write-Host "  ❌ Erreur lors de la création du réseau" -ForegroundColor Red
-        Set-Location ..
-        exit 1
-    }
-} else {
-    Write-Host "  ✓ Réseau $NETWORK_NAME existe déjà" -ForegroundColor Green
-}
-
 Write-Host "📦 Démarrage de MongoDB..." -ForegroundColor Yellow
+Set-Location setup-bd
+# Le réseau sera créé automatiquement par Docker Compose
 docker-compose up -d
 
 # Attendre que MongoDB soit healthy

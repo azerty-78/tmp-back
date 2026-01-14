@@ -53,4 +53,4 @@ networks:
   ${PROJECT_NAME:-project-name}-network:
     name: ${PROJECT_NAME:-project-name}-network
     driver: bridge
-    # Le réseau est créé ici et peut être utilisé par setup-api comme external
+    # Le réseau est créé automatiquement par Docker Compose

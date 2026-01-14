@@ -26,29 +26,12 @@ Ces scripts seront exécutés automatiquement au premier démarrage de MongoDB.
 
 ## Démarrage
 
-### Option 1 : Créer le réseau manuellement (Recommandé)
-
 ```bash
-# 1. Créer le réseau Docker (une seule fois)
-# Linux/Mac
-./create-network.sh
-
-# Windows PowerShell
-.\create-network.ps1
-
-# 2. Démarrer MongoDB
+# Démarrer MongoDB (le réseau sera créé automatiquement)
 docker-compose up -d
 ```
 
-### Option 2 : Créer le réseau avec Docker directement
-
-```bash
-# Créer le réseau (remplacez project-name par votre PROJECT_NAME)
-docker network create project-name-network
-
-# Puis démarrer MongoDB
-docker-compose up -d
-```
+Le réseau Docker `${PROJECT_NAME}-network` sera créé automatiquement par Docker Compose lors du premier démarrage.
 
 ### Commandes utiles
 
@@ -79,7 +62,8 @@ docker exec -it project-name-mongodb mongosh -u root -p qwerty87 --authenticatio
 
 ## Notes
 
-- Le réseau Docker `${PROJECT_NAME}-network` est créé automatiquement
+- Le réseau Docker `${PROJECT_NAME}-network` est créé automatiquement par Docker Compose
 - Les volumes `mongodb-data` et `mongodb-config` sont persistants
 - MongoDB est configuré avec l'authentification activée (`--auth`)
+- Le même réseau est utilisé par `setup-api` pour permettre la communication entre les services
 - ⚠️ En production, limitez l'accès au port MongoDB avec un firewall

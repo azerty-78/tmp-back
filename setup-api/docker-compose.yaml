@@ -64,9 +64,7 @@ services:
       - ${PROJECT_NAME:-project-name}-network
 
     # Note: MongoDB doit être démarré avant (via setup-bd)
-    # Le réseau ${PROJECT_NAME}-network doit être créé par setup-bd d'abord
-    # Si vous obtenez une erreur "undefined network", créez-le manuellement :
-    # docker network create ${PROJECT_NAME}-network
+    # Le réseau ${PROJECT_NAME}-network sera créé automatiquement par Docker Compose
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${API_PORT:-8090}/actuator/health"]
@@ -86,7 +84,5 @@ volumes:
 networks:
   ${PROJECT_NAME:-project-name}-network:
     name: ${PROJECT_NAME:-project-name}-network
-    external: true
-    # ⚠️ IMPORTANT: Le réseau doit être créé par setup-bd avant de démarrer l'API
-    # Créez-le avec: docker network create ${PROJECT_NAME}-network
-    # Ou utilisez le script: setup-bd/create-network.sh
+    driver: bridge
+    # Le réseau est créé automatiquement si il n'existe pas

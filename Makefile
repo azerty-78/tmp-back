@@ -25,14 +25,10 @@ init: ## Initialise le projet (copie les .env et configure)
 
 start: ## Démarre tous les services
 	@echo "🚀 Démarrage des services..."
-	@cd setup-bd && \
-		NETWORK_NAME="$${PROJECT_NAME:-project-name}-network" && \
-		if ! docker network ls | grep -q "$$NETWORK_NAME"; then \
-			echo "  🔧 Création du réseau $$NETWORK_NAME..."; \
-			docker network create "$$NETWORK_NAME"; \
-		fi
+	@echo "📦 Démarrage de MongoDB (le réseau sera créé automatiquement)..."
 	@cd setup-bd && docker-compose up -d
 	@sleep 5
+	@echo "📦 Démarrage de l'API..."
 	@cd setup-api && docker-compose up -d
 	@echo "✅ Services démarrés"
 	@$(MAKE) status
