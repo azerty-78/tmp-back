@@ -14,12 +14,10 @@ Ce dossier contient la configuration Docker pour la base de données MongoDB.
    cp env.example .env
    ```
 
-2. **Modifiez les valeurs dans `.env`** :
+2. **Modifiez ces valeurs dans `.env`** :
    - `PROJECT_NAME` : Nom de votre projet (utilisé pour les noms de conteneurs, volumes, réseaux)
-   - `MONGO_ROOT_USERNAME` : Nom d'utilisateur root MongoDB
-   - `MONGO_ROOT_PASSWORD` : Mot de passe root MongoDB (⚠️ changez-le en production !)
-   - `MONGO_DATABASE` : Nom de la base de données par défaut
-   - `MONGO_PORT` : Port d'exposition MongoDB (par défaut 27017)
+   - `MONGO_DATABASE` : Nom de votre base de données MongoDB
+   - Toutes les autres valeurs sont déjà configurées par défaut
 
 ## Scripts d'initialisation
 
@@ -47,13 +45,13 @@ docker-compose down -v
 ### Via MongoDB Compass
 
 ```
-mongodb://root:changeme@localhost:27017/?authSource=admin
+mongodb://root:qwerty87@localhost:27017/?authSource=admin
 ```
 
 ### Via mongosh
 
 ```bash
-docker exec -it project-name-mongodb mongosh -u root -p changeme --authenticationDatabase admin
+docker exec -it project-name-mongodb mongosh -u root -p qwerty87 --authenticationDatabase admin
 ```
 
 ## Notes

@@ -17,7 +17,7 @@ Ce projet est un template générique pour rapidement configurer un nouveau proj
     └── README.md
 ```
 
-## Personnalisation Rapide (3 étapes)
+## Personnalisation Rapide (2 modifications seulement !)
 
 ### 1. Configuration Base de Données
 
@@ -28,10 +28,9 @@ cd setup-bd
 cp env.example .env
 ```
 
-Modifiez `.env` avec les valeurs de votre projet :
+**Modifiez uniquement** :
 - `PROJECT_NAME` : Nom de votre projet (ex: `mon-client-api`)
-- `MONGO_ROOT_PASSWORD` : Mot de passe root MongoDB
-- `MONGO_DATABASE` : Nom de la base de données
+- `MONGO_DATABASE` : Nom de votre base de données (ex: `mon-client-db`)
 
 ### 2. Configuration API
 
@@ -42,12 +41,12 @@ cd setup-api
 cp env.example .env
 ```
 
-Modifiez `.env` avec les valeurs de votre projet :
-- `PROJECT_NAME` : **Même nom que dans setup-bd**
-- `DOCKERHUB_USERNAME` : Votre nom d'utilisateur Docker Hub
-- `SPRING_DATA_MONGODB_URI` : URI MongoDB (ajustez avec le PROJECT_NAME)
-- `JWT_SECRET` : Clé secrète JWT (changez-la !)
-- Toutes les autres variables selon vos besoins
+**Modifiez uniquement** :
+- `PROJECT_NAME` : **Même nom que dans setup-bd** (remplacez dans `SPRING_DATA_MONGODB_URI` pour le nom du conteneur)
+- `SPRING_DATA_MONGODB_URI` : Remplacez aussi le nom de la base de données par votre `MONGO_DATABASE`
+- `APP_BASE_URL` : URL de votre API (ex: `https://api.mondomaine.com` ou ngrok)
+- `APP_FRONTEND_URL` : URL de votre frontend (ex: `https://mondomaine.com`)
+- `ALLOWED_ORIGINS` : Ajoutez vos domaines autorisés
 
 ### 3. Démarrage
 
@@ -69,17 +68,19 @@ L'application crée automatiquement dans le conteneur :
 
 Ces dossiers sont montés via des volumes Docker persistants.
 
-## Variables Clés à Personnaliser
+## Variables à Personnaliser (Minimum)
 
 ### Obligatoires
-- `PROJECT_NAME` : Utilisé pour nommer les conteneurs, volumes et réseaux
-- `MONGO_ROOT_PASSWORD` : Mot de passe MongoDB
-- `JWT_SECRET` : Clé secrète JWT
+- `PROJECT_NAME` : Utilisé pour nommer les conteneurs, volumes et réseaux (dans setup-bd et setup-api)
+- `MONGO_DATABASE` : Nom de votre base de données MongoDB
+- `SPRING_DATA_MONGODB_URI` : URI MongoDB (remplacer PROJECT_NAME et MONGO_DATABASE)
+- `APP_BASE_URL` : URL de votre API
+- `APP_FRONTEND_URL` : URL de votre frontend
+- `ALLOWED_ORIGINS` : Domaines autorisés pour CORS
 
-### Recommandées
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD` : Compte admin par défaut
-- `APP_BASE_URL`, `APP_FRONTEND_URL` : URLs de l'application
+### Optionnelles (valeurs par défaut fonctionnelles)
 - `DOCKERHUB_USERNAME` : Pour pousser l'image Docker
+- Toutes les autres variables ont des valeurs par défaut opérationnelles
 
 ## Notes Importantes
 

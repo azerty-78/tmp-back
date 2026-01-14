@@ -15,10 +15,15 @@ Ce dossier contient la configuration Docker pour l'API du projet.
    cp env.example .env
    ```
 
-2. **Modifiez les valeurs dans `.env`** :
-   - `PROJECT_NAME` : Nom de votre projet (utilisé pour les noms de conteneurs, volumes, réseaux)
-   - `DOCKERHUB_USERNAME` : Votre nom d'utilisateur Docker Hub
-   - Toutes les autres variables selon vos besoins
+2. **Modifiez uniquement ces valeurs dans `.env`** :
+   - `PROJECT_NAME` : Nom de votre projet (identique à celui dans setup-bd)
+   - `SPRING_DATA_MONGODB_URI` : Remplacez dans l'URI :
+     - `project-name-mongodb` → `{PROJECT_NAME}-mongodb` (nom du conteneur)
+     - `project-name` (avant `?authSource`) → votre `MONGO_DATABASE` (nom de la base)
+   - `APP_BASE_URL` : URL de votre API (ex: `https://api.mondomaine.com`)
+   - `APP_FRONTEND_URL` : URL de votre frontend (ex: `https://mondomaine.com`)
+   - `ALLOWED_ORIGINS` : Ajoutez vos domaines autorisés
+   - `DOCKERHUB_USERNAME` : Votre nom d'utilisateur Docker Hub (optionnel)
 
 3. **Assurez-vous que le réseau Docker existe** :
    Le réseau `${PROJECT_NAME}-network` doit être créé par `setup-bd` avant de démarrer l'API.
