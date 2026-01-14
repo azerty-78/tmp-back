@@ -5,7 +5,6 @@ import com.kobecorporation.tmp_back.interaction.dto.users.request.LoginRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RefreshTokenRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RegisterRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.response.AuthResponse
-import com.kobecorporation.tmp_back.interaction.dto.users.response.UserResponse
 import com.kobecorporation.tmp_back.interaction.exception.AuthenticationException
 import com.kobecorporation.tmp_back.interaction.exception.ResourceAlreadyExistsException
 import com.kobecorporation.tmp_back.interaction.mapper.users.UserMapper
@@ -132,32 +131,31 @@ class AuthService(
     private fun processRefreshToken(userId: org.bson.types.ObjectId, refreshToken: String): Mono<AuthResponse> {
         return userRepository.findById(userId)
             .switchIfEmpty(Mono.error(AuthenticationException("User not found")))
-                .flatMap { user ->
-                    // Vérifier que le refresh token stocké correspond
-                    if (user.refreshToken != refreshToken) {
-                        return@flatMap Mono.error<AuthResponse>(
-                            AuthenticationException("Invalid refresh token")
-                        )
-                    }
-
-                    // Vérifier que le refresh token n'est pas expiré
-                    if (!user.hasValidRefreshToken()) {
-                        return@flatMap Mono.error<AuthResponse>(
-                            AuthenticationException("Refresh token expired")
-                        )
-                    }
-
-                    // Récupérer le flag rememberMe depuis le token
-                    val rememberMe = try {
-                        (jwtService.extractAllClaimsInternal(refreshToken)["rememberMe"] as? Boolean) ?: false
-                    } catch (e: Exception) {
-                        false
-                    }
-
-                    // Générer de nouveaux tokens et mettre à jour le refresh token dans la base
-                    generateAuthResponse(user, rememberMe)
+            .flatMap { user ->
+                // Vérifier que le refresh token stocké correspond
+                if (user.refreshToken != refreshToken) {
+                    return@flatMap Mono.error<AuthResponse>(
+                        AuthenticationException("Invalid refresh token")
+                    )
                 }
-        }
+
+                // Vérifier que le refresh token n'est pas expiré
+                if (!user.hasValidRefreshToken()) {
+                    return@flatMap Mono.error<AuthResponse>(
+                        AuthenticationException("Refresh token expired")
+                    )
+                }
+
+                // Récupérer le flag rememberMe depuis le token
+                val rememberMe = try {
+                    (jwtService.extractAllClaimsInternal(refreshToken)["rememberMe"] as? Boolean) ?: false
+                } catch (e: Exception) {
+                    false
+                }
+
+                // Générer de nouveaux tokens et mettre à jour le refresh token dans la base
+                generateAuthResponse(user, rememberMe)
+            }
     }
 
     /**
@@ -244,4 +242,3 @@ class AuthService(
         )
     }
 }
-        
