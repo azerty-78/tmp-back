@@ -17,9 +17,30 @@ Ce projet est un template générique pour rapidement configurer un nouveau proj
     └── README.md
 ```
 
-## Personnalisation Rapide (2 modifications seulement !)
+## Personnalisation Rapide (2 méthodes)
 
-### 1. Configuration Base de Données
+### Méthode 1 : Automatique (Recommandé) ⚡
+
+Utilisez les scripts d'initialisation :
+
+```bash
+# Linux/Mac
+./scripts/init-project.sh
+
+# Windows PowerShell
+.\scripts\init-project.ps1
+
+# Puis démarrez
+make start
+# ou
+./scripts/start.sh
+```
+
+Le script vous demandera toutes les informations nécessaires et configurera tout automatiquement !
+
+### Méthode 2 : Manuelle
+
+#### 1. Configuration Base de Données
 
 Dans `setup-bd/` :
 
@@ -32,7 +53,7 @@ cp env.example .env
 - `PROJECT_NAME` : Nom de votre projet (ex: `mon-client-api`)
 - `MONGO_DATABASE` : Nom de votre base de données (ex: `mon-client-db`)
 
-### 2. Configuration API
+#### 2. Configuration API
 
 Dans `setup-api/` :
 
@@ -48,7 +69,7 @@ cp env.example .env
 - `APP_FRONTEND_URL` : URL de votre frontend (ex: `https://mondomaine.com`)
 - `ALLOWED_ORIGINS` : Ajoutez vos domaines autorisés
 
-### 3. Démarrage
+#### 3. Démarrage
 
 ```bash
 # 1. Démarrer MongoDB (crée le réseau Docker)
@@ -91,19 +112,35 @@ Ces dossiers sont montés via des volumes Docker persistants.
 
 ## Commandes Utiles
 
+### Avec Makefile (Recommandé)
+
+```bash
+make help      # Affiche toutes les commandes
+make start     # Démarre tous les services
+make stop      # Arrête tous les services
+make logs      # Voir les logs
+make status    # Statut des conteneurs
+make rebuild   # Rebuild l'image API
+make clean     # Nettoie tout (⚠️ supprime les données)
+make validate  # Valide la configuration
+```
+
+### Commandes Docker manuelles
+
 ```bash
 # Voir les logs
-docker-compose logs -f
+docker-compose -f setup-bd/docker-compose.yaml -f setup-api/docker-compose.yaml logs -f
 
 # Arrêter les services
-docker-compose down
+cd setup-api && docker-compose down
+cd ../setup-bd && docker-compose down
 
 # Arrêter et supprimer les volumes (⚠️ supprime les données)
-docker-compose down -v
+cd setup-api && docker-compose down -v
+cd ../setup-bd && docker-compose down -v
 
 # Rebuild l'image API
-cd setup-api
-docker-compose build
+cd setup-api && docker-compose build
 ```
 
 ## Support
