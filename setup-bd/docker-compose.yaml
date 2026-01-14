@@ -1,0 +1,55 @@
+services:
+  # ==========================================
+  # MONGODB DATABASE
+  # ==========================================
+  mongodb:
+    image: mongo:7.0
+    container_name: project_name-mongodb
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-qwerty87}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-project_name}
+
+    ports:
+      # Exposer MongoDB pour accès externe (MongoDB Compass)
+      # ⚠️ SÉCURITÉ: En production, utilisez un firewall pour limiter l'accès
+      # ou configurez MongoDB pour n'accepter que certaines IPs
+      - "${MONGO_PORT:-27017}:27017"
+
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+
+    networks:
+      - blogpress-network
+
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    command: ["--auth"]
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  mongodb-data:
+    name: project_name-mongodb-data
+    driver: local
+  mongodb-config:
+    name: project_name-mongodb-config
+    driver: local
+
+# ============
+# ==RÉSEAUX ==
+# ============
+networks:
+  blogpress-network:
+    name: project_name-network
+    driver: bridge

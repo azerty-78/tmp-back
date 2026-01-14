@@ -1,0 +1,86 @@
+services:
+  api:
+    # Utiliser l'image depuis Docker Hub (poussée par CI/CD)
+    image: ${DOCKERHUB_USERNAME:-azerty-78}/blogpress-api:latest
+    container_name: blogpress-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8090}:8090"
+
+    # Charger toutes les variables du .env
+    env_file:
+      - .env
+
+    # Variables d'environnement
+    environment:
+      # Spring
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-prod}
+
+      # URLs
+      APP_BASE_URL: ${APP_BASE_URL}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+
+      # MongoDB
+      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      MONGO_AUTO_INDEX: ${MONGO_AUTO_INDEX}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TOKEN_EXPIRATION: ${JWT_ACCESS_TOKEN_EXPIRATION}
+      JWT_REFRESH_TOKEN_EXPIRATION: ${JWT_REFRESH_TOKEN_EXPIRATION}
+
+      # Admin
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_FIRSTNAME: ${ADMIN_FIRSTNAME}
+      ADMIN_LASTNAME: ${ADMIN_LASTNAME}
+
+      # File Storage
+      FILE_STORAGE_BASE_PATH: ${FILE_STORAGE_BASE_PATH}
+      FILE_STORAGE_MAX_FILE_SIZE: ${FILE_STORAGE_MAX_FILE_SIZE}
+      FILE_STORAGE_ALLOWED_TYPES: ${FILE_STORAGE_ALLOWED_TYPES}
+      MULTIPART_MAX_FILE_SIZE: ${MULTIPART_MAX_FILE_SIZE}
+      MULTIPART_MAX_REQUEST_SIZE: ${MULTIPART_MAX_REQUEST_SIZE}
+
+      # Logging
+      LOG_LEVEL_ROOT: ${LOG_LEVEL_ROOT}
+      LOG_LEVEL_APP: ${LOG_LEVEL_APP}
+      LOG_LEVEL_MONGO: ${LOG_LEVEL_MONGO}
+
+      # DevTools
+      DEVTOOLS_ENABLED: ${DEVTOOLS_ENABLED}
+
+      # Java
+      JAVA_OPTS: ${JAVA_OPTS}
+
+    volumes:
+      - api-uploads:/app/uploads
+      - api-logs:/app/logs
+
+    networks:
+      - blogpress-network
+
+    # Note: MongoDB doit être démarré avant (via setup-db)
+    # Le réseau blogpress-network doit exister (créé par setup-db)
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  api-uploads:
+    name: blogpress-api-uploads
+    driver: local
+  api-logs:
+    name: blogpress-api-logs
+    driver: local
+
+networks:
+  blogpress-network:
+    name: blogpress-network
+    external: true
