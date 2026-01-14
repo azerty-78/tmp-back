@@ -56,7 +56,7 @@ class DataInitializer(
                         password = passwordEncoder.encode(adminPassword),
                         firstName = adminFirstName,
                         lastName = adminLastName,
-                        role = Role.ROOT_ADMIN, // ⚠️ ROOT_ADMIN, pas ADMIN
+                        role = Role.ROOT_ADMIN, // ⚠️ ROOT_ADMIN
                         isEmailVerified = true,
                         isActive = true,
                         bio = "Default Root Administrator - System Owner",
