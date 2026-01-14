@@ -1,0 +1,18 @@
+# Fichiers d'environnement
+.env
+.env.local
+.env.*.local
+
+# Données MongoDB (ne pas versionner)
+data/
+*.db
+
+# Logs
+logs/
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

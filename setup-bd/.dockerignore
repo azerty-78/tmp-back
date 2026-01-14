@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+HELP.md
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.*.local
+
+# Données MongoDB
+data/
+*.db
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

@@ -29,9 +29,10 @@ RUN ls -lh /app/build/libs/ && \
 FROM eclipse-temurin:21-jre-alpine
 
 # Métadonnées
-LABEL maintainer="blogpress@example.com"
+# Personnalisez ces valeurs selon votre projet
+LABEL maintainer="your-email@example.com"
 LABEL version="1.0"
-LABEL description="Blogpress API - Spring Boot Application"
+LABEL description="API - Spring Boot Application"
 
 # Installer curl pour healthcheck et configurer timezone
 RUN apk add --no-cache curl tzdata && \
@@ -45,11 +46,12 @@ RUN addgroup -S spring && \
 # Répertoire de travail
 WORKDIR /app
 
-# Créer les dossiers pour les uploads Note : ici c'etait pour le projet blogpress mais ce ne serai pas forcement pour tout les projets
-RUN mkdir -p /app/uploads/profile-pictures \
-             /app/uploads/blog-covers \
-             /app/uploads/blog-logos \
-             /app/uploads/article-covers && \
+# Créer les dossiers obligatoires pour le stockage des images
+# - users: pour les images de profil utilisateur
+# - stock: pour les images de produits/articles (e-commerce)
+RUN mkdir -p /app/uploads/users \
+             /app/uploads/stock \
+             /app/logs && \
     chown -R spring:spring /app
 
 # Copier le JAR depuis l'étape de build

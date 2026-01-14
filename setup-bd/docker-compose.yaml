@@ -4,13 +4,13 @@ services:
   # ==========================================
   mongodb:
     image: mongo:7.0
-    container_name: project_name-mongodb
+    container_name: ${PROJECT_NAME:-project-name}-mongodb
     restart: unless-stopped
 
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-qwerty87}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-project_name}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-${PROJECT_NAME:-project-name}}
 
     ports:
       # Exposer MongoDB pour accès externe (MongoDB Compass)
@@ -24,7 +24,7 @@ services:
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
 
     networks:
-      - blogpress-network
+      - ${PROJECT_NAME:-project-name}-network
 
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
@@ -40,16 +40,16 @@ services:
 # ==========================================
 volumes:
   mongodb-data:
-    name: project_name-mongodb-data
+    name: ${PROJECT_NAME:-project-name}-mongodb-data
     driver: local
   mongodb-config:
-    name: project_name-mongodb-config
+    name: ${PROJECT_NAME:-project-name}-mongodb-config
     driver: local
 
 # ============
 # ==RÉSEAUX ==
 # ============
 networks:
-  blogpress-network:
-    name: project_name-network
+  ${PROJECT_NAME:-project-name}-network:
+    name: ${PROJECT_NAME:-project-name}-network
     driver: bridge

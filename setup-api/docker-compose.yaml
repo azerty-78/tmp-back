@@ -1,8 +1,9 @@
 services:
   api:
     # Utiliser l'image depuis Docker Hub (poussée par CI/CD)
-    image: ${DOCKERHUB_USERNAME:-azerty-78}/blogpress-api:latest
-    container_name: blogpress-api
+    # Remplacez ${PROJECT_NAME} par le nom de votre projet lors de la personnalisation
+    image: ${DOCKERHUB_USERNAME:-your-username}/${PROJECT_NAME:-project-name}-api:latest
+    container_name: ${PROJECT_NAME:-project-name}-api
     restart: unless-stopped
     ports:
       - "${API_PORT:-8090}:8090"
@@ -60,13 +61,13 @@ services:
       - api-logs:/app/logs
 
     networks:
-      - blogpress-network
+      - ${PROJECT_NAME:-project-name}-network
 
-    # Note: MongoDB doit être démarré avant (via setup-db)
-    # Le réseau blogpress-network doit exister (créé par setup-db)
+    # Note: MongoDB doit être démarré avant (via setup-bd)
+    # Le réseau ${PROJECT_NAME}-network doit exister (créé par setup-bd)
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT:-8090}/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -74,13 +75,13 @@ services:
 
 volumes:
   api-uploads:
-    name: blogpress-api-uploads
+    name: ${PROJECT_NAME:-project-name}-api-uploads
     driver: local
   api-logs:
-    name: blogpress-api-logs
+    name: ${PROJECT_NAME:-project-name}-api-logs
     driver: local
 
 networks:
-  blogpress-network:
-    name: blogpress-network
+  ${PROJECT_NAME:-project-name}-network:
+    name: ${PROJECT_NAME:-project-name}-network
     external: true
