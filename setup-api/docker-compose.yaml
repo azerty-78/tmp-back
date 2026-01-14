@@ -61,7 +61,7 @@ services:
       - api-logs:/app/logs
 
     networks:
-      - ${PROJECT_NAME:-project-name}-network
+      - app-network
 
     # Note: MongoDB doit être démarré avant (via setup-bd)
     # Le réseau ${PROJECT_NAME}-network sera créé automatiquement par Docker Compose
@@ -82,7 +82,7 @@ volumes:
     driver: local
 
 networks:
-  ${PROJECT_NAME:-project-name}-network:
+  app-network:
     name: ${PROJECT_NAME:-project-name}-network
     driver: bridge
-    # Le réseau est créé automatiquement si il n'existe pas
+    # Le réseau est créé automatiquement avec le nom du projet

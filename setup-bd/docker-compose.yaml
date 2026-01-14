@@ -24,7 +24,7 @@ services:
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
 
     networks:
-      - ${PROJECT_NAME:-project-name}-network
+      - app-network
 
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
@@ -50,7 +50,7 @@ volumes:
 # ==RÉSEAUX ==
 # ============
 networks:
-  ${PROJECT_NAME:-project-name}-network:
+  app-network:
     name: ${PROJECT_NAME:-project-name}-network
     driver: bridge
     # Le réseau est créé automatiquement par Docker Compose
