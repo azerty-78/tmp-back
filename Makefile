@@ -25,6 +25,12 @@ init: ## Initialise le projet (copie les .env et configure)
 
 start: ## Démarre tous les services
 	@echo "🚀 Démarrage des services..."
+	@cd setup-bd && \
+		NETWORK_NAME="$${PROJECT_NAME:-project-name}-network" && \
+		if ! docker network ls | grep -q "$$NETWORK_NAME"; then \
+			echo "  🔧 Création du réseau $$NETWORK_NAME..."; \
+			docker network create "$$NETWORK_NAME"; \
+		fi
 	@cd setup-bd && docker-compose up -d
 	@sleep 5
 	@cd setup-api && docker-compose up -d
