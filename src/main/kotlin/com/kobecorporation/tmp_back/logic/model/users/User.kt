@@ -24,19 +24,19 @@ data class User(
     val username: String,
     @Indexed(unique = true)
     val email: String,
-    val password: String,
-    
+    val password: String?,
+
     val firstName: String,
     val lastName: String,
-    
+
     val birthDate: LocalDate? = null,
     val gender: Gender? = null,
-    
+
     val role: Role = Role.USER,
-    
+
     val isActive: Boolean = true,
     val isEmailVerified: Boolean = false,
-    
+
     val profilePicture: String? = null,
     val bio: String? = null,
     val website: String? = null,
