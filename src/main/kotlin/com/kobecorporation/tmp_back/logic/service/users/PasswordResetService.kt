@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
-import java.io.Serializable
 import java.time.Instant
 
 /**
@@ -34,18 +33,9 @@ class PasswordResetService(
      */
     fun requestPasswordReset(request: ForgotPasswordRequest): Mono<Map<String, Any>> {
         return userRepository.findByEmail(request.email.lowercase())
-            .switchIfEmpty(
-                // Pour des raisons de sécurité, on ne révèle pas si l'email existe
-                Mono.just(
-                    mapOf(
-                        "success" to true,
-                        "message" to "Si cette adresse email existe, un lien de réinitialisation a été envoyé."
-                    )
-                )
-            )
             .flatMap { user ->
                 if (!user.isEmailVerified) {
-                    return@flatMap Mono.just(
+                    return@flatMap Mono.just<Map<String, Any>>(
                         mapOf(
                             "success" to false,
                             "message" to "Votre adresse email n'a pas été vérifiée. Veuillez d'abord vérifier votre email."
@@ -72,7 +62,7 @@ class PasswordResetService(
                             userName = savedUser.fullName
                         )
                             .then(
-                                Mono.just(
+                                Mono.just<Map<String, Any>>(
                                     mapOf(
                                         "success" to true,
                                         "message" to "Si cette adresse email existe, un lien de réinitialisation a été envoyé."
@@ -81,15 +71,24 @@ class PasswordResetService(
                             )
                     }
             }
-            .onErrorResume { error ->
-                logger.error("Erreur lors de la demande de réinitialisation de mot de passe", error)
-                Mono.just(
+            .switchIfEmpty(
+                // Pour des raisons de sécurité, on ne révèle pas si l'email existe
+                Mono.just<Map<String, Any>>(
                     mapOf(
                         "success" to true,
                         "message" to "Si cette adresse email existe, un lien de réinitialisation a été envoyé."
                     )
                 )
-            } as Mono<Map<String, Any>>
+            )
+            .onErrorResume { error ->
+                logger.error("Erreur lors de la demande de réinitialisation de mot de passe", error)
+                Mono.just<Map<String, Any>>(
+                    mapOf(
+                        "success" to true,
+                        "message" to "Si cette adresse email existe, un lien de réinitialisation a été envoyé."
+                    )
+                )
+            }
     }
     
     /**

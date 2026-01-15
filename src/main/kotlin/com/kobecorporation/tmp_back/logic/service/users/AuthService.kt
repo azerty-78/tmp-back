@@ -75,6 +75,8 @@ class AuthService(
                 }
             )
             .flatMap { user ->
+                // Capturer le code avant de sauvegarder
+                val verificationCode = user.emailVerificationCode ?: ""
                 userRepository.save(user)
                     .flatMap { savedUser ->
                         // Envoyer l'email de vérification
