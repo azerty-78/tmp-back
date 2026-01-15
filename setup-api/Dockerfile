@@ -11,13 +11,15 @@ COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle ./gradle
 
 # Télécharger les dépendances (cache Docker)
-RUN gradle dependencies --no-daemon --quiet || true
+# Utiliser --build-cache pour accélérer les builds suivants
+RUN gradle dependencies --no-daemon --quiet --build-cache || true
 
 # Copier le code source (inclut src/main/resources/application.properties)
 COPY src ./src
 
 # Build l'application
-RUN gradle clean bootJar --no-daemon --quiet
+# Utiliser --build-cache et ne pas faire clean à chaque fois (le cache Docker gère ça)
+RUN gradle bootJar --no-daemon --quiet --build-cache
 
 # Vérifier que le JAR a été créé
 RUN ls -lh /app/build/libs/ && \

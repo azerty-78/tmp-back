@@ -61,6 +61,8 @@ services:
     volumes:
       - api-uploads:/app/uploads
       - api-logs:/app/logs
+      # Cache Gradle pour accélérer les builds
+      - gradle-cache:/root/.gradle
 
     networks:
       - app-network
@@ -82,9 +84,13 @@ volumes:
   api-logs:
     name: ${PROJECT_NAME:-project-name}-api-logs
     driver: local
+  gradle-cache:
+    name: ${PROJECT_NAME:-project-name}-gradle-cache
+    driver: local
 
 networks:
   app-network:
     name: ${PROJECT_NAME:-project-name}-network
     driver: bridge
-    # Le réseau est créé automatiquement avec le nom du projet
+    external: false
+    # Le réseau est créé automatiquement par setup-bd ou setup-api

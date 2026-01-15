@@ -31,6 +31,16 @@ fi
 source setup-bd/.env
 source setup-api/.env
 
+PROJECT_NAME=${PROJECT_NAME:-project-name}
+NETWORK_NAME="${PROJECT_NAME}-network"
+
+# Nettoyer le réseau s'il existe déjà mais n'a pas été créé par compose
+echo -e "${YELLOW}🔧 Vérification du réseau Docker...${NC}"
+if docker network ls --format "{{.Name}}" | grep -q "^${NETWORK_NAME}$"; then
+    echo -e "${YELLOW}⚠️  Le réseau $NETWORK_NAME existe déjà. Suppression...${NC}"
+    docker network rm "$NETWORK_NAME" 2>/dev/null || echo "   (Le réseau sera recréé par Docker Compose)"
+fi
+
 echo "📦 Démarrage de MongoDB..."
 cd setup-bd
 # Le réseau sera créé automatiquement par Docker Compose

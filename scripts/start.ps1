@@ -25,6 +25,18 @@ $bdEnv = Get-Content "setup-bd\.env" | Where-Object { $_ -match "^[^#]" -and $_ 
 }
 
 $projectName = ($bdEnv | Where-Object { $_.Key -eq "PROJECT_NAME" }).Value
+$networkName = "${projectName}-network"
+
+# Nettoyer le réseau s'il existe déjà mais n'a pas été créé par compose
+Write-Host "🔧 Vérification du réseau Docker..." -ForegroundColor Yellow
+$existingNetwork = docker network ls --format "{{.Name}}" | Select-String -Pattern "^${networkName}$"
+if ($existingNetwork) {
+    Write-Host "⚠️  Le réseau $networkName existe déjà. Suppression..." -ForegroundColor Yellow
+    docker network rm $networkName 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "   (Le réseau sera recréé par Docker Compose)" -ForegroundColor Gray
+    }
+}
 
 Write-Host "📦 Démarrage de MongoDB..." -ForegroundColor Yellow
 Set-Location setup-bd
