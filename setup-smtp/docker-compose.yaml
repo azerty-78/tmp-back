@@ -1,0 +1,22 @@
+services:
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ${PROJECT_NAME:-project-name}-mailhog
+    restart: unless-stopped
+    ports:
+      # Port SMTP pour envoi d'emails
+      - "${SMTP_PORT:-1025}:1025"
+      # Interface web MailHog pour visualiser les emails
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    networks:
+      - app-network
+    # Charger les variables d'environnement depuis le fichier .env
+    env_file:
+      - .env
+
+networks:
+  app-network:
+    name: ${PROJECT_NAME:-project-name}-network
+    driver: bridge
+    external: false
+    # Le réseau sera créé automatiquement ou réutilisé depuis setup-bd/setup-api

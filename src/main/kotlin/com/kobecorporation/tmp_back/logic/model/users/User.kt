@@ -46,6 +46,14 @@ data class User(
     val refreshToken: String? = null,
     val refreshTokenExpiresAt: Instant? = null,
     
+    // Vérification d'email
+    val emailVerificationCode: String? = null,
+    val emailVerificationCodeExpiresAt: Instant? = null,
+    
+    // Réinitialisation de mot de passe
+    val passwordResetToken: String? = null,
+    val passwordResetTokenExpiresAt: Instant? = null,
+    
     // Tracking
     @Indexed
     val createdAt: Instant = Instant.now(),
@@ -77,6 +85,26 @@ data class User(
         return refreshToken != null && 
                refreshTokenExpiresAt != null && 
                refreshTokenExpiresAt!!.isAfter(Instant.now())
+    }
+    
+    /**
+     * Vérifie si le code de vérification d'email est valide
+     */
+    fun hasValidVerificationCode(code: String): Boolean {
+        return emailVerificationCode != null &&
+               emailVerificationCode == code &&
+               emailVerificationCodeExpiresAt != null &&
+               emailVerificationCodeExpiresAt!!.isAfter(Instant.now())
+    }
+    
+    /**
+     * Vérifie si le token de réinitialisation de mot de passe est valide
+     */
+    fun hasValidPasswordResetToken(token: String): Boolean {
+        return passwordResetToken != null &&
+               passwordResetToken == token &&
+               passwordResetTokenExpiresAt != null &&
+               passwordResetTokenExpiresAt!!.isAfter(Instant.now())
     }
     
     /**

@@ -1,0 +1,25 @@
+# Fichiers d'environnement
+# ⚠️ IMPORTANT: Le fichier .env ne doit jamais être commité
+# Il contient des configurations spécifiques à chaque environnement
+.env
+.env.local
+.env.*.local
+
+# Fichiers temporaires Docker Compose
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Logs
+logs/
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Fichiers de sauvegarde
+*.bak
+*.backup
+*~

@@ -43,6 +43,36 @@ ask_value "Origines autorisées CORS (ALLOWED_ORIGINS)" "$APP_FRONTEND_URL,http:
 ask_value "Nom d'utilisateur Docker Hub (optionnel)" "" DOCKERHUB_USERNAME
 
 echo ""
+echo -e "${YELLOW}📧 Configuration SMTP (Email) :${NC}"
+echo "  Pour le développement, utilisez MailHog (localhost:1025)"
+echo "  Pour la production, utilisez les paramètres SMTP de votre fournisseur"
+echo ""
+read -p "Utiliser la configuration SMTP de production ? (o/N): " USE_PRODUCTION_SMTP
+USE_PRODUCTION_SMTP=${USE_PRODUCTION_SMTP:-n}
+
+if [ "$USE_PRODUCTION_SMTP" = "o" ] || [ "$USE_PRODUCTION_SMTP" = "O" ]; then
+    echo -e "${GREEN}Configuration SMTP PRODUCTION${NC}"
+    ask_value "Host SMTP (MAIL_HOST)" "smtp.lws.fr" MAIL_HOST
+    ask_value "Port SMTP (MAIL_PORT)" "587" MAIL_PORT
+    ask_value "Nom d'utilisateur SMTP (MAIL_USERNAME)" "" MAIL_USERNAME
+    read -sp "Mot de passe SMTP (MAIL_PASSWORD): " MAIL_PASSWORD
+    echo ""
+    MAIL_SMTP_AUTH="true"
+    MAIL_SMTP_STARTTLS="true"
+else
+    echo -e "${GREEN}Configuration SMTP TEST (MailHog)${NC}"
+    MAIL_HOST="localhost"
+    MAIL_PORT="1025"
+    MAIL_USERNAME=""
+    MAIL_PASSWORD=""
+    MAIL_SMTP_AUTH="false"
+    MAIL_SMTP_STARTTLS="false"
+fi
+
+ask_value "Adresse email expéditrice (EMAIL_FROM_ADDRESS)" "noreply@example.com" EMAIL_FROM_ADDRESS
+ask_value "Nom expéditeur (EMAIL_FROM_NAME)" "KOBE Corporation" EMAIL_FROM_NAME
+
+echo ""
 echo "⏳ Configuration en cours..."
 
 # Créer les fichiers .env
@@ -57,6 +87,20 @@ if [ ! -f "setup-bd/.env" ]; then
     echo "  ✅ setup-bd/.env créé"
 else
     echo "  ⚠️  setup-bd/.env existe déjà, ignoré"
+fi
+
+# Setup SMTP
+if [ ! -f "setup-smtp/.env" ]; then
+    if [ -f "setup-smtp/env.example" ]; then
+        cp setup-smtp/env.example setup-smtp/.env
+        sed -i.bak "s/PROJECT_NAME=project-name/PROJECT_NAME=$PROJECT_NAME/" setup-smtp/.env
+        rm setup-smtp/.env.bak 2>/dev/null || true
+        echo "  ✅ setup-smtp/.env créé"
+    else
+        echo "  ⚠️  setup-smtp/env.example introuvable, ignoré"
+    fi
+else
+    echo "  ⚠️  setup-smtp/.env existe déjà, ignoré"
 fi
 
 # Setup API
@@ -79,6 +123,23 @@ if [ ! -f "setup-api/.env" ]; then
     if [ -n "$DOCKERHUB_USERNAME" ]; then
         sed -i.bak "s/DOCKERHUB_USERNAME=.*/DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME/" setup-api/.env
     fi
+    
+    # Configuration SMTP
+    sed -i.bak "s|MAIL_HOST=.*|MAIL_HOST=$MAIL_HOST|" setup-api/.env
+    sed -i.bak "s|MAIL_PORT=.*|MAIL_PORT=$MAIL_PORT|" setup-api/.env
+    if [ -n "$MAIL_USERNAME" ]; then
+        sed -i.bak "s|MAIL_USERNAME=.*|MAIL_USERNAME=$MAIL_USERNAME|" setup-api/.env
+    fi
+    if [ -n "$MAIL_PASSWORD" ]; then
+        sed -i.bak "s|MAIL_PASSWORD=.*|MAIL_PASSWORD=$MAIL_PASSWORD|" setup-api/.env
+    fi
+    sed -i.bak "s|MAIL_SMTP_AUTH=.*|MAIL_SMTP_AUTH=$MAIL_SMTP_AUTH|" setup-api/.env
+    sed -i.bak "s|MAIL_SMTP_STARTTLS=.*|MAIL_SMTP_STARTTLS=$MAIL_SMTP_STARTTLS|" setup-api/.env
+    
+    # Configuration Email Application
+    sed -i.bak "s|EMAIL_FROM_ADDRESS=.*|EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS|" setup-api/.env
+    sed -i.bak "s|EMAIL_FROM_NAME=.*|EMAIL_FROM_NAME=$EMAIL_FROM_NAME|" setup-api/.env
+    sed -i.bak "s|EMAIL_FRONTEND_URL=.*|EMAIL_FRONTEND_URL=$APP_FRONTEND_URL|" setup-api/.env
     
     rm setup-api/.env.bak 2>/dev/null || true
     echo "  ✅ setup-api/.env créé"
@@ -112,7 +173,10 @@ echo ""
 echo -e "${GREEN}✨ Initialisation terminée avec succès !${NC}"
 echo ""
 echo "📋 Prochaines étapes :"
-echo "  1. Vérifiez les fichiers .env dans setup-bd/ et setup-api/"
-echo "  2. Lancez './scripts/start.sh' pour démarrer les services"
-echo "  3. Ou utilisez 'make start' si vous avez un Makefile"
+echo "  1. Vérifiez les fichiers .env dans setup-bd/, setup-api/ et setup-smtp/"
+echo "  2. Si vous utilisez MailHog (mode test), démarrez-le :"
+echo "     cd setup-smtp"
+echo "     docker-compose up -d"
+echo "  3. Lancez './scripts/start.sh' pour démarrer les services"
+echo "  4. Ou utilisez 'make start' si vous avez un Makefile"
 echo ""

@@ -1,16 +1,23 @@
 package com.kobecorporation.tmp_back.logic.service.users
 
+import com.kobecorporation.tmp_back.configuration.email.EmailProperties
 import com.kobecorporation.tmp_back.configuration.security.jwt.JwtService
 import com.kobecorporation.tmp_back.interaction.dto.users.request.LoginRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RefreshTokenRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RegisterRequest
+import com.kobecorporation.tmp_back.interaction.dto.users.request.ResendVerificationCodeRequest
+import com.kobecorporation.tmp_back.interaction.dto.users.request.VerifyEmailRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.response.AuthResponse
 import com.kobecorporation.tmp_back.interaction.exception.AuthenticationException
 import com.kobecorporation.tmp_back.interaction.exception.ResourceAlreadyExistsException
+import com.kobecorporation.tmp_back.interaction.exception.ResourceNotFoundException
 import com.kobecorporation.tmp_back.interaction.mapper.users.UserMapper
 import com.kobecorporation.tmp_back.logic.model.users.Role
 import com.kobecorporation.tmp_back.logic.model.users.User
 import com.kobecorporation.tmp_back.logic.repository.users.UserRepository
+import com.kobecorporation.tmp_back.logic.service.email.EmailService
+import com.kobecorporation.tmp_back.util.CodeGenerator
+import org.slf4j.LoggerFactory
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
@@ -30,17 +37,27 @@ import java.time.LocalDate
 class AuthService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val jwtService: JwtService
+    private val jwtService: JwtService,
+    private val emailService: EmailService,
+    private val emailProperties: EmailProperties
 ) {
+    
+    private val logger = LoggerFactory.getLogger(AuthService::class.java)
 
     /**
      * Inscription d'un nouvel utilisateur
+     * 
+     * Crée le compte mais l'email n'est pas vérifié
+     * Un code de vérification est envoyé par email
      */
-    fun register(registerRequest: RegisterRequest): Mono<AuthResponse> {
+    fun register(registerRequest: RegisterRequest): Mono<Map<String, Any>> {
         return checkUserExists(registerRequest.email, registerRequest.username)
             .then(
                 Mono.fromCallable {
                     val birthDate = registerRequest.birthDate?.let { LocalDate.parse(it) }
+                    val verificationCode = CodeGenerator.generateVerificationCode()
+                    val codeExpiresAt = Instant.now()
+                        .plusSeconds(emailProperties.verificationCodeExpirationMinutes * 60)
 
                     User(
                         username = registerRequest.username.lowercase(),
@@ -50,14 +67,110 @@ class AuthService(
                         lastName = registerRequest.lastName,
                         birthDate = birthDate,
                         gender = registerRequest.gender,
-                        role = Role.USER // Par défaut, tous les nouveaux utilisateurs sont USER
+                        role = Role.USER, // Par défaut, tous les nouveaux utilisateurs sont USER
+                        isEmailVerified = false,
+                        emailVerificationCode = verificationCode,
+                        emailVerificationCodeExpiresAt = codeExpiresAt
                     )
                 }
             )
             .flatMap { user ->
                 userRepository.save(user)
                     .flatMap { savedUser ->
+                        // Envoyer l'email de vérification
+                        emailService.sendVerificationEmail(
+                            to = savedUser.email,
+                            code = verificationCode,
+                            userName = savedUser.fullName
+                        )
+                        .then(
+                            Mono.just(mapOf(
+                                "success" to true,
+                                "message" to "Inscription réussie. Un code de vérification a été envoyé à votre adresse email.",
+                                "email" to savedUser.email,
+                                "emailVerified" to false
+                            ))
+                        )
+                    }
+            }
+    }
+    
+    /**
+     * Vérifie l'email avec le code de vérification
+     */
+    fun verifyEmail(verifyEmailRequest: VerifyEmailRequest): Mono<AuthResponse> {
+        return userRepository.findByEmail(verifyEmailRequest.email.lowercase())
+            .switchIfEmpty(
+                Mono.error(ResourceNotFoundException("Aucun compte trouvé avec cet email"))
+            )
+            .flatMap { user ->
+                if (user.isEmailVerified) {
+                    return@flatMap Mono.error<AuthResponse>(
+                        AuthenticationException("Cette adresse email est déjà vérifiée")
+                    )
+                }
+                
+                if (!user.hasValidVerificationCode(verifyEmailRequest.code)) {
+                    return@flatMap Mono.error<AuthResponse>(
+                        AuthenticationException("Code de vérification invalide ou expiré")
+                    )
+                }
+                
+                // Marquer l'email comme vérifié et supprimer le code
+                val updatedUser = user.copy(
+                    isEmailVerified = true,
+                    emailVerificationCode = null,
+                    emailVerificationCodeExpiresAt = null,
+                    updatedAt = Instant.now()
+                )
+                
+                userRepository.save(updatedUser)
+                    .flatMap { savedUser ->
+                        logger.info("Email vérifié avec succès pour : ${savedUser.email}")
                         generateAuthResponse(savedUser, rememberMe = false)
+                    }
+            }
+    }
+    
+    /**
+     * Renvoie le code de vérification
+     */
+    fun resendVerificationCode(resendRequest: ResendVerificationCodeRequest): Mono<Map<String, Any>> {
+        return userRepository.findByEmail(resendRequest.email.lowercase())
+            .switchIfEmpty(
+                Mono.error(ResourceNotFoundException("Aucun compte trouvé avec cet email"))
+            )
+            .flatMap { user ->
+                if (user.isEmailVerified) {
+                    return@flatMap Mono.error<Map<String, Any>>(
+                        AuthenticationException("Cette adresse email est déjà vérifiée")
+                    )
+                }
+                
+                // Générer un nouveau code
+                val verificationCode = CodeGenerator.generateVerificationCode()
+                val codeExpiresAt = Instant.now()
+                    .plusSeconds(emailProperties.verificationCodeExpirationMinutes * 60)
+                
+                val updatedUser = user.copy(
+                    emailVerificationCode = verificationCode,
+                    emailVerificationCodeExpiresAt = codeExpiresAt,
+                    updatedAt = Instant.now()
+                )
+                
+                userRepository.save(updatedUser)
+                    .flatMap { savedUser ->
+                        emailService.sendVerificationEmail(
+                            to = savedUser.email,
+                            code = verificationCode,
+                            userName = savedUser.fullName
+                        )
+                        .then(
+                            Mono.just(mapOf(
+                                "success" to true,
+                                "message" to "Un nouveau code de vérification a été envoyé à votre adresse email."
+                            ))
+                        )
                     }
             }
     }
@@ -72,6 +185,13 @@ class AuthService(
                 if (!user.isActive) {
                     return@flatMap Mono.error<AuthResponse>(
                         AuthenticationException("Votre compte a été désactivé. Veuillez contacter le support.")
+                    )
+                }
+                
+                // Vérifier que l'email est vérifié
+                if (!user.isEmailVerified) {
+                    return@flatMap Mono.error<AuthResponse>(
+                        AuthenticationException("Votre adresse email n'a pas été vérifiée. Veuillez vérifier votre email ou demander un nouveau code.")
                     )
                 }
 
@@ -240,5 +360,15 @@ class AuthService(
         .switchIfEmpty(
             Mono.error(AuthenticationException("Identifiants invalides"))
         )
+    }
+    
+    /**
+     * Trouve un utilisateur par email
+     */
+    private fun findUserByEmail(email: String): Mono<User> {
+        return userRepository.findByEmail(email.lowercase())
+            .switchIfEmpty(
+                Mono.error(ResourceNotFoundException("Aucun compte trouvé avec cet email"))
+            )
     }
 }

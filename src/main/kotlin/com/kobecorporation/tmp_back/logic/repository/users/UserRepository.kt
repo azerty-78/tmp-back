@@ -52,4 +52,9 @@ interface UserRepository : ReactiveMongoRepository<User, ObjectId> {
      * Trouve tous les utilisateurs actifs
      */
     fun findByIsActiveTrue(): reactor.core.publisher.Flux<User>
+    
+    /**
+     * Trouve un utilisateur par token de réinitialisation de mot de passe
+     */
+    fun findByPasswordResetToken(token: String): Mono<User>
 }

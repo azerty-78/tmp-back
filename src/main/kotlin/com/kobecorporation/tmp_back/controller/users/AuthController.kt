@@ -1,12 +1,18 @@
 package com.kobecorporation.tmp_back.controller.users
 
+import com.kobecorporation.tmp_back.interaction.dto.users.request.ForgotPasswordRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.LoginRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RefreshTokenRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.request.RegisterRequest
+import com.kobecorporation.tmp_back.interaction.dto.users.request.ResendVerificationCodeRequest
+import com.kobecorporation.tmp_back.interaction.dto.users.request.ResetPasswordRequest
+import com.kobecorporation.tmp_back.interaction.dto.users.request.VerifyEmailRequest
 import com.kobecorporation.tmp_back.interaction.dto.users.response.AuthResponse
 import com.kobecorporation.tmp_back.interaction.exception.AuthenticationException
 import com.kobecorporation.tmp_back.interaction.exception.ResourceAlreadyExistsException
+import com.kobecorporation.tmp_back.interaction.exception.ResourceNotFoundException
 import com.kobecorporation.tmp_back.logic.service.users.AuthService
+import com.kobecorporation.tmp_back.logic.service.users.PasswordResetService
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -20,14 +26,19 @@ import java.util.*
  * 
  * Endpoints :
  * - POST /api/auth/register : Inscription
+ * - POST /api/auth/verify-email : Vérification d'email avec code
+ * - POST /api/auth/resend-verification-code : Renvoyer le code de vérification
  * - POST /api/auth/login : Connexion
  * - POST /api/auth/refresh : Rafraîchissement de token
  * - POST /api/auth/logout : Déconnexion (côté client)
+ * - POST /api/auth/forgot-password : Demander une réinitialisation de mot de passe
+ * - POST /api/auth/reset-password : Réinitialiser le mot de passe avec un token
  */
 @RestController
 @RequestMapping("/api/auth")
 class AuthController(
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val passwordResetService: PasswordResetService
 ) {
 
     private val logger = LoggerFactory.getLogger(AuthController::class.java)
@@ -43,16 +54,11 @@ class AuthController(
         logger.info("[$requestId] Register request for email: ${registerRequest.email}")
 
         return authService.register(registerRequest)
-            .map { authResponse ->
-                logger.info("[$requestId] User registered successfully: ${authResponse.user.username}")
+            .map { response ->
+                logger.info("[$requestId] User registered successfully: ${registerRequest.email}")
                 ResponseEntity
                     .status(HttpStatus.CREATED)
-                    .body(mapOf(
-                        "success" to true,
-                        "message" to "Inscription réussie",
-                        "data" to authResponse,
-                        "requestId" to requestId
-                    ))
+                    .body(response + mapOf("requestId" to requestId))
             }
             .onErrorResume(ResourceAlreadyExistsException::class.java) { e ->
                 logger.warn("[$requestId] Registration failed: ${e.message}")
@@ -170,6 +176,189 @@ class AuthController(
                         .body(mapOf(
                             "success" to false,
                             "message" to "Erreur lors du rafraîchissement",
+                            "errorCode" to "INTERNAL_ERROR",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+    }
+
+    /**
+     * Vérification d'email avec code
+     */
+    @PostMapping("/verify-email")
+    fun verifyEmail(
+        @Valid @RequestBody verifyEmailRequest: VerifyEmailRequest
+    ): Mono<ResponseEntity<Map<String, Any>>> {
+        val requestId = UUID.randomUUID().toString()
+        logger.info("[$requestId] Email verification request for: ${verifyEmailRequest.email}")
+
+        return authService.verifyEmail(verifyEmailRequest)
+            .map { authResponse ->
+                logger.info("[$requestId] Email verified successfully: ${verifyEmailRequest.email}")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "Email vérifié avec succès",
+                        "data" to authResponse,
+                        "requestId" to requestId
+                    )
+                )
+            }
+            .onErrorResume(AuthenticationException::class.java) { e ->
+                logger.warn("[$requestId] Email verification failed: ${e.message}")
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to (e.message ?: "Code de vérification invalide"),
+                            "errorCode" to "AUTHENTICATION_FAILED",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+            .onErrorResume(ResourceNotFoundException::class.java) { e ->
+                logger.warn("[$requestId] Email verification failed: ${e.message}")
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to (e.message ?: "Compte non trouvé"),
+                            "errorCode" to "RESOURCE_NOT_FOUND",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+            .onErrorResume { e ->
+                logger.error("[$requestId] Email verification error: ${e.message}", e)
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to "Erreur lors de la vérification",
+                            "errorCode" to "INTERNAL_ERROR",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+    }
+
+    /**
+     * Renvoyer le code de vérification
+     */
+    @PostMapping("/resend-verification-code")
+    fun resendVerificationCode(
+        @Valid @RequestBody resendRequest: ResendVerificationCodeRequest
+    ): Mono<ResponseEntity<Map<String, Any>>> {
+        val requestId = UUID.randomUUID().toString()
+        logger.info("[$requestId] Resend verification code request for: ${resendRequest.email}")
+
+        return authService.resendVerificationCode(resendRequest)
+            .map { response ->
+                logger.info("[$requestId] Verification code resent successfully: ${resendRequest.email}")
+                ResponseEntity.ok(response + mapOf("requestId" to requestId))
+            }
+            .onErrorResume(ResourceNotFoundException::class.java) { e ->
+                logger.warn("[$requestId] Resend verification code failed: ${e.message}")
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to (e.message ?: "Compte non trouvé"),
+                            "errorCode" to "RESOURCE_NOT_FOUND",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+            .onErrorResume(AuthenticationException::class.java) { e ->
+                logger.warn("[$requestId] Resend verification code failed: ${e.message}")
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to (e.message ?: "Erreur lors de l'envoi"),
+                            "errorCode" to "BAD_REQUEST",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+            .onErrorResume { e ->
+                logger.error("[$requestId] Resend verification code error: ${e.message}", e)
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to "Erreur lors de l'envoi du code",
+                            "errorCode" to "INTERNAL_ERROR",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+    }
+
+    /**
+     * Demander une réinitialisation de mot de passe
+     */
+    @PostMapping("/forgot-password")
+    fun forgotPassword(
+        @Valid @RequestBody forgotPasswordRequest: ForgotPasswordRequest
+    ): Mono<ResponseEntity<Map<String, Any>>> {
+        val requestId = UUID.randomUUID().toString()
+        logger.info("[$requestId] Forgot password request for: ${forgotPasswordRequest.email}")
+
+        return passwordResetService.requestPasswordReset(forgotPasswordRequest)
+            .map { response ->
+                logger.info("[$requestId] Password reset request processed: ${forgotPasswordRequest.email}")
+                ResponseEntity.ok(response + mapOf("requestId" to requestId))
+            }
+            .onErrorResume { e ->
+                logger.error("[$requestId] Forgot password error: ${e.message}", e)
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to "Erreur lors de la demande de réinitialisation",
+                            "errorCode" to "INTERNAL_ERROR",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+    }
+
+    /**
+     * Réinitialiser le mot de passe avec un token
+     */
+    @PostMapping("/reset-password")
+    fun resetPassword(
+        @Valid @RequestBody resetPasswordRequest: ResetPasswordRequest
+    ): Mono<ResponseEntity<Map<String, Any>>> {
+        val requestId = UUID.randomUUID().toString()
+        logger.info("[$requestId] Reset password request")
+
+        return passwordResetService.resetPassword(resetPasswordRequest)
+            .map { response ->
+                logger.info("[$requestId] Password reset successfully")
+                ResponseEntity.ok(response + mapOf("requestId" to requestId))
+            }
+            .onErrorResume(AuthenticationException::class.java) { e ->
+                logger.warn("[$requestId] Password reset failed: ${e.message}")
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to (e.message ?: "Token invalide ou expiré"),
+                            "errorCode" to "AUTHENTICATION_FAILED",
+                            "requestId" to requestId
+                        ))
+                )
+            }
+            .onErrorResume { e ->
+                logger.error("[$requestId] Password reset error: ${e.message}", e)
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(mapOf(
+                            "success" to false,
+                            "message" to "Erreur lors de la réinitialisation",
                             "errorCode" to "INTERNAL_ERROR",
                             "requestId" to requestId
                         ))
