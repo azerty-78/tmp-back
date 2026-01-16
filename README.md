@@ -881,7 +881,26 @@ Template interne - KOBE CORPORATION
 
 - **`GUIDE-DEMARRAGE.md`** : Guide rapide pour lancer et tester le projet
 - **`GUIDE-FRONTEND.md`** : Documentation complète pour intégrer le frontend
-- **`setup-smtp/GUIDE-UTILISATION.md`** : Guide détaillé du système d'envoi d'emails
+- **`QUEL-SMTP-UTILISER.md`** : ⭐ **Guide complet** - MailHog vs Gmail vs Production
+- **`PRODUCTION-SMTP.md`** : ⚠️ **IMPORTANT** - Configuration SMTP en production sur VPS
+- **`CONFIGURATION-GMAIL.md`** : Guide pour configurer Gmail SMTP et tester avec votre boîte Gmail
+- **`setup-smtp/README.md`** : Guide détaillé du système d'envoi d'emails avec MailHog
+
+---
+
+## 🔒 Sécurité du Code de Vérification
+
+**Le code de vérification est généré de manière aléatoire et sécurisée !**
+
+Le système utilise `SecureRandom` de Java, qui est :
+- ✅ **Cryptographiquement sécurisé** : Utilise un générateur de nombres aléatoires cryptographiquement fort
+- ✅ **Imprévisible** : Impossible de deviner ou prédire le prochain code
+- ✅ **Aléatoire** : Chaque code a une probabilité égale (1 chance sur 1 000 000)
+- ✅ **Non séquentiel** : Les codes ne suivent pas un ordre prévisible
+
+**Format** : 6 chiffres (000000 à 999999)
+
+Voir **`CONFIGURATION-GMAIL.md`** pour tester avec votre boîte Gmail.
 
 ---
 
