@@ -879,6 +879,7 @@ Template interne - KOBE CORPORATION
 
 ## 📚 Documentation Complémentaire
 
+- **`TESTS-CURL.md`** : ⚡ **Toutes les commandes curl** pour tester l'API
 - **`GUIDE-DEMARRAGE.md`** : Guide rapide pour lancer et tester le projet
 - **`GUIDE-FRONTEND.md`** : Documentation complète pour intégrer le frontend
 - **`QUEL-SMTP-UTILISER.md`** : ⭐ **Guide complet** - MailHog vs Gmail vs Production
