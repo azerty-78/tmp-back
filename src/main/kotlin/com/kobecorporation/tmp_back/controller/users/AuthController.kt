@@ -73,16 +73,36 @@ class AuthController(
                 )
             }
             .onErrorResume { e ->
-                logger.error("[$requestId] Registration error: ${e.message}", e)
-                Mono.just(
-                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(mapOf(
-                            "success" to false,
-                            "message" to "Erreur lors de l'inscription",
-                            "errorCode" to "INTERNAL_ERROR",
-                            "requestId" to requestId
-                        ))
-                )
+                // Détecter les erreurs d'envoi d'email spécifiquement
+                val isEmailError = e.message?.contains("Impossible d'envoyer l'email", ignoreCase = true) == true ||
+                                  e.message?.contains("Mail", ignoreCase = true) == true ||
+                                  e.cause?.message?.contains("Mail", ignoreCase = true) == true ||
+                                  e.cause?.message?.contains("Authentication failed", ignoreCase = true) == true
+                
+                if (isEmailError) {
+                    logger.error("[$requestId] Registration failed: Email could not be sent. SMTP configuration issue.", e)
+                    Mono.just(
+                        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                            .body(mapOf(
+                                "success" to false,
+                                "message" to "Impossible d'envoyer l'email de vérification. Le serveur d'envoi d'emails n'est pas disponible ou mal configuré. Veuillez réessayer plus tard ou contacter le support.",
+                                "errorCode" to "EMAIL_SERVICE_UNAVAILABLE",
+                                "requestId" to requestId,
+                                "details" to "L'utilisateur n'a pas été créé car l'email de vérification n'a pas pu être envoyé."
+                            ))
+                    )
+                } else {
+                    logger.error("[$requestId] Registration error: ${e.message}", e)
+                    Mono.just(
+                        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(mapOf(
+                                "success" to false,
+                                "message" to "Erreur lors de l'inscription",
+                                "errorCode" to "INTERNAL_ERROR",
+                                "requestId" to requestId
+                            ))
+                    )
+                }
             }
     }
 
