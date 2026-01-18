@@ -52,13 +52,20 @@ class AuthService(
      * Le compte n'est activé qu'après vérification du code
      */
     fun register(registerRequest: RegisterRequest): Mono<Map<String, Any>> {
+        logger.info("📝 [REGISTER] Début de l'inscription pour : ${registerRequest.email}")
+        
         return checkUserExists(registerRequest.email, registerRequest.username)
+            .doOnSuccess {
+                logger.info("✅ [REGISTER] Vérification email/username : OK (pas de doublon)")
+            }
             .then(
                 Mono.fromCallable {
+                    logger.info("🔧 [REGISTER] Génération du code de vérification...")
                     val birthDate = registerRequest.birthDate?.let { LocalDate.parse(it) }
                     val verificationCode = CodeGenerator.generateVerificationCode()
                     // Code valide pendant 10 minutes
                     val codeExpiresAt = Instant.now().plusSeconds(600) // 10 minutes = 600 secondes
+                    logger.info("✅ [REGISTER] Code généré : $verificationCode (expire dans 10 minutes)")
 
                     User(
                         username = registerRequest.username.lowercase(),
@@ -76,6 +83,10 @@ class AuthService(
                 }
             )
             .flatMap { user ->
+                logger.info("📧 [REGISTER] Tentative d'envoi de l'email AVANT création de l'utilisateur...")
+                logger.info("📧 [REGISTER] Email destinataire : ${user.email}")
+                logger.info("📧 [REGISTER] Code à envoyer : ${user.emailVerificationCode}")
+                
                 // Capturer le code et le nom avant de sauvegarder
                 val verificationCode = user.emailVerificationCode ?: ""
                 val userName = user.fullName
@@ -87,11 +98,18 @@ class AuthService(
                     code = verificationCode,
                     userName = userName
                 )
+                .doOnSuccess {
+                    logger.info("✅ [REGISTER] Email envoyé avec succès ! Création de l'utilisateur...")
+                }
+                .doOnError { error ->
+                    logger.error("❌ [REGISTER] ÉCHEC de l'envoi d'email. L'utilisateur NE SERA PAS créé.", error)
+                }
                 .flatMap {
                     // SEULEMENT si l'email est envoyé avec succès, créer l'utilisateur
+                    logger.info("💾 [REGISTER] Sauvegarde de l'utilisateur dans la base de données...")
                     userRepository.save(user)
                         .map { savedUser ->
-                            logger.info("✅ Utilisateur créé après envoi réussi de l'email de vérification : ${savedUser.email}")
+                            logger.info("✅ [REGISTER] Utilisateur créé avec succès : ${savedUser.email} (ID: ${savedUser.id})")
                             mapOf(
                                 "success" to true,
                                 "message" to "Inscription réussie. Un code de vérification a été envoyé à votre adresse email (valide 10 minutes).",

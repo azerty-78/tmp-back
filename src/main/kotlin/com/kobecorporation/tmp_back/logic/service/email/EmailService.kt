@@ -30,15 +30,24 @@ class EmailService(
      * L'erreur est propagée pour faire échouer l'inscription si l'email ne peut pas être envoyé
      */
     fun sendVerificationEmail(to: String, code: String, userName: String): Mono<Void> {
-        val subject = "Vérification de votre adresse email - ${emailProperties.fromName}"
-        val message = buildVerificationEmailMessage(code, userName)
+        logger.info("📧 [EMAIL] sendVerificationEmail() appelé")
+        logger.info("📧 [EMAIL] Destinataire : $to")
+        logger.info("📧 [EMAIL] Code : $code")
+        logger.info("📧 [EMAIL] Nom utilisateur : $userName")
         
+        val subject = "Vérification de votre adresse email - ${emailProperties.fromName}"
+        logger.info("📧 [EMAIL] Sujet : $subject")
+        
+        val message = buildVerificationEmailMessage(code, userName)
+        logger.info("📧 [EMAIL] Message construit (${message.length} caractères)")
+        
+        logger.info("📧 [EMAIL] Appel de sendEmail()...")
         return sendEmail(to, subject, message)
             .doOnSuccess {
-                logger.info("Email de vérification envoyé avec succès à : $to")
+                logger.info("✅ [EMAIL] Email de vérification envoyé avec succès à : $to")
             }
             .doOnError { error ->
-                logger.error("Erreur lors de l'envoi de l'email de vérification à : $to", error)
+                logger.error("❌ [EMAIL] Erreur lors de l'envoi de l'email de vérification à : $to", error)
             }
     }
     
@@ -81,22 +90,51 @@ class EmailService(
      * Envoie un email générique
      */
     private fun sendEmail(to: String, subject: String, content: String): Mono<Void> {
+        logger.info("📮 [SEND_EMAIL] Début de l'envoi d'email")
+        logger.info("📮 [SEND_EMAIL] Configuration SMTP :")
+        logger.info("   - From: ${emailProperties.fromName} <${emailProperties.fromAddress}>")
+        logger.info("   - To: $to")
+        logger.info("   - Subject: $subject")
+        logger.info("   - Content length: ${content.length} caractères")
+        
         return Mono.fromCallable {
+            logger.info("📮 [SEND_EMAIL] Création du message SimpleMailMessage...")
             val message = SimpleMailMessage()
             message.setFrom("${emailProperties.fromName} <${emailProperties.fromAddress}>")
             message.setTo(to)
             message.setSubject(subject)
             message.setText(content)
             
+            logger.info("📮 [SEND_EMAIL] Message créé. Tentative d'envoi via JavaMailSender...")
+            logger.info("📮 [SEND_EMAIL] mailSender.send() appelé...")
+            
             try {
                 mailSender.send(message)
+                logger.info("✅ [SEND_EMAIL] mailSender.send() réussi !")
             } catch (e: MailException) {
-                logger.error("Erreur lors de l'envoi de l'email", e)
+                logger.error("❌ [SEND_EMAIL] EXCEPTION lors de l'envoi de l'email", e)
+                logger.error("❌ [SEND_EMAIL] Type d'exception : ${e.javaClass.simpleName}")
+                logger.error("❌ [SEND_EMAIL] Message : ${e.message}")
+                if (e.cause != null) {
+                    logger.error("❌ [SEND_EMAIL] Cause : ${e.cause?.javaClass?.simpleName} - ${e.cause?.message}")
+                }
                 throw RuntimeException("Impossible d'envoyer l'email", e)
             }
         }
         .subscribeOn(Schedulers.boundedElastic())
+        .doOnSubscribe {
+            logger.info("📮 [SEND_EMAIL] Subscription sur boundedElastic scheduler")
+        }
+        .doOnError { error ->
+            logger.error("❌ [SEND_EMAIL] Erreur dans le Mono : ${error.javaClass.simpleName} - ${error.message}")
+        }
         .then()
+        .doOnSuccess {
+            logger.info("✅ [SEND_EMAIL] Mono terminé avec succès")
+        }
+        .doOnError { error ->
+            logger.error("❌ [SEND_EMAIL] Mono terminé avec erreur : ${error.javaClass.simpleName}", error)
+        }
     }
     
     /**
