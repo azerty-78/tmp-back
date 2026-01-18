@@ -47,8 +47,9 @@ class AuthService(
     /**
      * Inscription d'un nouvel utilisateur
      * 
-     * Crée le compte mais l'email n'est pas vérifié
-     * Un code de vérification est envoyé par email
+     * IMPORTANT : L'utilisateur n'est créé QUE si l'email est envoyé avec succès
+     * Un code de vérification est envoyé par email (valide 10 minutes)
+     * Le compte n'est activé qu'après vérification du code
      */
     fun register(registerRequest: RegisterRequest): Mono<Map<String, Any>> {
         return checkUserExists(registerRequest.email, registerRequest.username)
@@ -56,8 +57,8 @@ class AuthService(
                 Mono.fromCallable {
                     val birthDate = registerRequest.birthDate?.let { LocalDate.parse(it) }
                     val verificationCode = CodeGenerator.generateVerificationCode()
-                    val codeExpiresAt = Instant.now()
-                        .plusSeconds(emailProperties.verificationCodeExpirationMinutes * 60)
+                    // Code valide pendant 10 minutes
+                    val codeExpiresAt = Instant.now().plusSeconds(600) // 10 minutes = 600 secondes
 
                     User(
                         username = registerRequest.username.lowercase(),
@@ -75,30 +76,38 @@ class AuthService(
                 }
             )
             .flatMap { user ->
-                // Capturer le code avant de sauvegarder
+                // Capturer le code et le nom avant de sauvegarder
                 val verificationCode = user.emailVerificationCode ?: ""
-                userRepository.save(user)
-                    .flatMap { savedUser ->
-                        // Envoyer l'email de vérification
-                        emailService.sendVerificationEmail(
-                            to = savedUser.email,
-                            code = verificationCode,
-                            userName = savedUser.fullName
-                        )
-                        .then(
-                            Mono.just(mapOf(
+                val userName = user.fullName
+                
+                // Envoyer l'email de vérification AVANT de créer l'utilisateur
+                // Si l'email ne peut pas être envoyé, l'inscription échouera et l'utilisateur ne sera pas créé
+                emailService.sendVerificationEmail(
+                    to = user.email,
+                    code = verificationCode,
+                    userName = userName
+                )
+                .flatMap {
+                    // SEULEMENT si l'email est envoyé avec succès, créer l'utilisateur
+                    userRepository.save(user)
+                        .map { savedUser ->
+                            logger.info("✅ Utilisateur créé après envoi réussi de l'email de vérification : ${savedUser.email}")
+                            mapOf(
                                 "success" to true,
-                                "message" to "Inscription réussie. Un code de vérification a été envoyé à votre adresse email.",
+                                "message" to "Inscription réussie. Un code de vérification a été envoyé à votre adresse email (valide 10 minutes).",
                                 "email" to savedUser.email,
                                 "emailVerified" to false
-                            ))
-                        )
-                    }
+                            )
+                        }
+                }
             }
     }
     
     /**
      * Vérifie l'email avec le code de vérification
+     * 
+     * IMPORTANT : Le compte n'est créé/activé qu'après vérification du code
+     * Un email de confirmation est envoyé avec le rôle et le nom
      */
     fun verifyEmail(verifyEmailRequest: VerifyEmailRequest): Mono<AuthResponse> {
         return userRepository.findByEmail(verifyEmailRequest.email.lowercase())
@@ -114,7 +123,7 @@ class AuthService(
                 
                 if (!user.hasValidVerificationCode(verifyEmailRequest.code)) {
                     return@flatMap Mono.error<AuthResponse>(
-                        AuthenticationException("Code de vérification invalide ou expiré")
+                        AuthenticationException("Code de vérification invalide ou expiré. Le code est valide pendant 10 minutes.")
                     )
                 }
                 
@@ -128,8 +137,18 @@ class AuthService(
                 
                 userRepository.save(updatedUser)
                     .flatMap { savedUser ->
-                        logger.info("Email vérifié avec succès pour : ${savedUser.email}")
-                        generateAuthResponse(savedUser, rememberMe = false)
+                        logger.info("✅ Email vérifié avec succès pour : ${savedUser.email}")
+                        
+                        // Envoyer un email de confirmation avec le rôle et le nom
+                        emailService.sendAccountConfirmationEmail(
+                            to = savedUser.email,
+                            userName = savedUser.fullName,
+                            role = savedUser.role.name
+                        )
+                        .then(
+                            // Générer la réponse d'authentification (tokens JWT)
+                            generateAuthResponse(savedUser, rememberMe = false)
+                        )
                     }
             }
     }
@@ -149,10 +168,9 @@ class AuthService(
                     )
                 }
                 
-                // Générer un nouveau code
+                // Générer un nouveau code (valide 10 minutes)
                 val verificationCode = CodeGenerator.generateVerificationCode()
-                val codeExpiresAt = Instant.now()
-                    .plusSeconds(emailProperties.verificationCodeExpirationMinutes * 60)
+                val codeExpiresAt = Instant.now().plusSeconds(600) // 10 minutes = 600 secondes
                 
                 val updatedUser = user.copy(
                     emailVerificationCode = verificationCode,

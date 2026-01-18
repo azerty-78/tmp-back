@@ -1,6 +1,7 @@
 package com.kobecorporation.tmp_back.logic.service.email
 
 import com.kobecorporation.tmp_back.configuration.email.EmailProperties
+import com.kobecorporation.tmp_back.interaction.exception.AuthenticationException
 import org.slf4j.LoggerFactory
 import org.springframework.mail.MailException
 import org.springframework.mail.SimpleMailMessage
@@ -26,7 +27,7 @@ class EmailService(
     
     /**
      * Envoie un email de vérification avec un code
-     * Ne fait PAS échouer le flux en cas d'erreur (non-bloquant)
+     * L'erreur est propagée pour faire échouer l'inscription si l'email ne peut pas être envoyé
      */
     fun sendVerificationEmail(to: String, code: String, userName: String): Mono<Void> {
         val subject = "Vérification de votre adresse email - ${emailProperties.fromName}"
@@ -38,18 +39,12 @@ class EmailService(
             }
             .doOnError { error ->
                 logger.error("Erreur lors de l'envoi de l'email de vérification à : $to", error)
-                logger.warn("⚠️ L'inscription a réussi mais l'email n'a pas pu être envoyé. L'utilisateur pourra demander un renvoi du code.")
-            }
-            .onErrorResume { error ->
-                // Ne pas faire échouer le flux en cas d'erreur d'envoi d'email
-                // L'utilisateur pourra demander un renvoi du code plus tard
-                logger.warn("⚠️ Impossible d'envoyer l'email de vérification (SMTP non configuré ou identifiants invalides). L'inscription continue...")
-                Mono.empty()
             }
     }
     
     /**
      * Envoie un email de réinitialisation de mot de passe
+     * FAIT ÉCHOUER le flux si l'email ne peut pas être envoyé
      */
     fun sendPasswordResetEmail(to: String, resetToken: String, userName: String): Mono<Void> {
         val subject = "Réinitialisation de votre mot de passe - ${emailProperties.fromName}"
@@ -58,10 +53,27 @@ class EmailService(
         
         return sendEmail(to, subject, message)
             .doOnSuccess {
-                logger.info("Email de réinitialisation de mot de passe envoyé avec succès à : $to")
+                logger.info("✅ Email de réinitialisation de mot de passe envoyé avec succès à : $to")
             }
             .doOnError { error ->
-                logger.error("Erreur lors de l'envoi de l'email de réinitialisation à : $to", error)
+                logger.error("❌ Erreur lors de l'envoi de l'email de réinitialisation à : $to", error)
+            }
+    }
+    
+    /**
+     * Envoie un email de confirmation de création de compte
+     * Inclut le rôle et le nom de l'utilisateur
+     */
+    fun sendAccountConfirmationEmail(to: String, userName: String, role: String): Mono<Void> {
+        val subject = "Bienvenue sur ${emailProperties.fromName} - Votre compte a été créé"
+        val message = buildAccountConfirmationMessage(userName, role)
+        
+        return sendEmail(to, subject, message)
+            .doOnSuccess {
+                logger.info("✅ Email de confirmation de compte envoyé avec succès à : $to")
+            }
+            .doOnError { error ->
+                logger.error("❌ Erreur lors de l'envoi de l'email de confirmation à : $to", error)
             }
     }
     
@@ -89,6 +101,7 @@ class EmailService(
     
     /**
      * Construit le message d'email de vérification
+     * Le code est toujours valide pendant 10 minutes
      */
     private fun buildVerificationEmailMessage(code: String, userName: String): String {
         return """
@@ -96,11 +109,11 @@ class EmailService(
             
             Bienvenue sur ${emailProperties.fromName} !
             
-            Pour vérifier votre adresse email, veuillez utiliser le code de vérification suivant :
+            Pour vérifier votre adresse email et activer votre compte, veuillez utiliser le code de vérification suivant :
             
             Code : $code
             
-            Ce code est valide pendant ${emailProperties.verificationCodeExpirationMinutes} minutes.
+            ⚠️ Ce code est valide pendant 10 minutes seulement.
             
             Si vous n'avez pas créé de compte, veuillez ignorer cet email.
             
@@ -126,6 +139,38 @@ class EmailService(
             
             Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email.
             Votre mot de passe ne sera pas modifié.
+            
+            Cordialement,
+            L'équipe ${emailProperties.fromName}
+        """.trimIndent()
+    }
+    
+    /**
+     * Construit le message d'email de confirmation de compte
+     */
+    private fun buildAccountConfirmationMessage(userName: String, role: String): String {
+        val roleDisplayName = when (role.uppercase()) {
+            "USER" -> "Utilisateur"
+            "EMPLOYE" -> "Employé"
+            "ADMIN" -> "Administrateur"
+            "ROOT_ADMIN" -> "Administrateur Principal"
+            else -> role
+        }
+        
+        return """
+            Bonjour $userName,
+            
+            Félicitations ! Votre compte a été créé avec succès sur ${emailProperties.fromName}.
+            
+            Votre compte :
+            - Nom : $userName
+            - Rôle : $roleDisplayName
+            
+            Vous pouvez maintenant vous connecter et profiter de tous nos services.
+            
+            Si vous avez des questions ou besoin d'aide, n'hésitez pas à nous contacter.
+            
+            Bienvenue parmi nous !
             
             Cordialement,
             L'équipe ${emailProperties.fromName}
