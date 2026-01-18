@@ -26,6 +26,7 @@ class EmailService(
     
     /**
      * Envoie un email de vérification avec un code
+     * Ne fait PAS échouer le flux en cas d'erreur (non-bloquant)
      */
     fun sendVerificationEmail(to: String, code: String, userName: String): Mono<Void> {
         val subject = "Vérification de votre adresse email - ${emailProperties.fromName}"
@@ -37,6 +38,13 @@ class EmailService(
             }
             .doOnError { error ->
                 logger.error("Erreur lors de l'envoi de l'email de vérification à : $to", error)
+                logger.warn("⚠️ L'inscription a réussi mais l'email n'a pas pu être envoyé. L'utilisateur pourra demander un renvoi du code.")
+            }
+            .onErrorResume { error ->
+                // Ne pas faire échouer le flux en cas d'erreur d'envoi d'email
+                // L'utilisateur pourra demander un renvoi du code plus tard
+                logger.warn("⚠️ Impossible d'envoyer l'email de vérification (SMTP non configuré ou identifiants invalides). L'inscription continue...")
+                Mono.empty()
             }
     }
     
