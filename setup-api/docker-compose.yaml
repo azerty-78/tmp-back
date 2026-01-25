@@ -33,12 +33,28 @@ services:
       JWT_ACCESS_TOKEN_EXPIRATION: ${JWT_ACCESS_TOKEN_EXPIRATION}
       JWT_REFRESH_TOKEN_EXPIRATION: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
-      # Admin
+      # Admin (legacy - pour compatibilité)
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_FIRSTNAME: ${ADMIN_FIRSTNAME}
       ADMIN_LASTNAME: ${ADMIN_LASTNAME}
+
+      # Platform Admin (Super Admin Multi-Tenant)
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD}
+      PLATFORM_ADMIN_USERNAME: ${PLATFORM_ADMIN_USERNAME}
+      PLATFORM_ADMIN_FIRSTNAME: ${PLATFORM_ADMIN_FIRSTNAME}
+      PLATFORM_ADMIN_LASTNAME: ${PLATFORM_ADMIN_LASTNAME}
+
+      # Multi-Tenant Configuration
+      TENANT_PLATFORM_DOMAIN: ${TENANT_PLATFORM_DOMAIN}
+      TENANT_SUBDOMAIN_PREFIX: ${TENANT_SUBDOMAIN_PREFIX}
+      TENANT_HEADER_NAME: ${TENANT_HEADER_NAME}
+      TENANT_DEFAULT_PLAN: ${TENANT_DEFAULT_PLAN}
+      TENANT_TRIAL_DAYS: ${TENANT_TRIAL_DAYS}
+      TENANT_MAX_PER_USER: ${TENANT_MAX_PER_USER}
+      TENANT_VERIFY_DNS: ${TENANT_VERIFY_DNS}
 
       # File Storage
       FILE_STORAGE_BASE_PATH: ${FILE_STORAGE_BASE_PATH}
@@ -94,6 +110,22 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
+
+    # ==========================================
+    # LABELS TRAEFIK (Production - optionnel)
+    # ==========================================
+    # Décommenter ces labels si vous utilisez Traefik comme reverse proxy
+    # labels:
+    #   - "traefik.enable=true"
+    #   # Route pour le domaine principal
+    #   - "traefik.http.routers.api.rule=Host(`api.${TENANT_PLATFORM_DOMAIN:-kobecorporation.com}`)"
+    #   - "traefik.http.routers.api.entrypoints=websecure"
+    #   - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.api.loadbalancer.server.port=8090"
+    #   # Route wildcard pour les sous-domaines tenants (kb-saas-*.kobecorporation.com)
+    #   - "traefik.http.routers.api-tenants.rule=HostRegexp(`kb-saas-{slug:[a-z0-9-]+}.${TENANT_PLATFORM_DOMAIN:-kobecorporation.com}`)"
+    #   - "traefik.http.routers.api-tenants.entrypoints=websecure"
+    #   - "traefik.http.routers.api-tenants.tls.certresolver=letsencrypt"
 
 volumes:
   api-uploads:

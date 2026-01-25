@@ -1,0 +1,74 @@
+# ==========================================
+# TRAEFIK REVERSE PROXY (OPTIONNEL)
+# ==========================================
+# Ce setup est OPTIONNEL et n'est nécessaire que pour :
+# - Gérer les domaines custom des tenants (*.kobecorporation.com + domaines clients)
+# - SSL/HTTPS automatique avec Let's Encrypt
+# - Load balancing si plusieurs instances de l'API
+#
+# Pour le développement local, ce container N'EST PAS NÉCESSAIRE.
+# ==========================================
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: ${PROJECT_NAME:-project-name}-traefik
+    restart: unless-stopped
+    
+    command:
+      # API Dashboard (désactivé en prod)
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=${PROJECT_NAME:-project-name}-network"
+      
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      
+      # Redirection HTTP → HTTPS (décommenter en production)
+      # - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      
+      # Let's Encrypt (décommenter en production)
+      # - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      
+      # Logging
+      - "--log.level=INFO"
+    
+    ports:
+      - "80:80"
+      - "443:443"
+      # Dashboard Traefik (localhost:8080 - désactiver en prod)
+      - "8080:8080"
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+    
+    networks:
+      - app-network
+    
+    env_file:
+      - .env
+    
+    labels:
+      # Dashboard Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+volumes:
+  traefik-certificates:
+    name: ${PROJECT_NAME:-project-name}-traefik-certs
+    driver: local
+
+networks:
+  app-network:
+    name: ${PROJECT_NAME:-project-name}-network
+    external: true
