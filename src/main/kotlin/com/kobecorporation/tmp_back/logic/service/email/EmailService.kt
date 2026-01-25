@@ -1,7 +1,8 @@
 package com.kobecorporation.tmp_back.logic.service.email
 
 import com.kobecorporation.tmp_back.configuration.email.EmailProperties
-import com.kobecorporation.tmp_back.interaction.exception.AuthenticationException
+import com.kobecorporation.tmp_back.configuration.tenant.TenantContext
+import com.kobecorporation.tmp_back.logic.model.tenant.Tenant
 import org.slf4j.LoggerFactory
 import org.springframework.mail.MailException
 import org.springframework.mail.SimpleMailMessage
@@ -13,9 +14,16 @@ import reactor.core.scheduler.Schedulers
 /**
  * Service pour l'envoi d'emails
  * 
+ * Architecture Multi-Tenant :
+ * - Supporte le branding personnalisé par tenant
+ * - Utilise le nom et email du tenant si configuré
+ * - Fallback sur la configuration par défaut
+ * 
  * Gère l'envoi d'emails pour :
  * - Vérification d'email lors de l'inscription
  * - Réinitialisation de mot de passe
+ * - Invitations à rejoindre un tenant
+ * - Bienvenue dans un tenant
  */
 @Service
 class EmailService(
@@ -192,6 +200,7 @@ class EmailService(
             "EMPLOYE" -> "Employé"
             "ADMIN" -> "Administrateur"
             "ROOT_ADMIN" -> "Administrateur Principal"
+            "PLATFORM_ADMIN" -> "Administrateur Plateforme"
             else -> role
         }
         
@@ -212,6 +221,221 @@ class EmailService(
             
             Cordialement,
             L'équipe ${emailProperties.fromName}
+        """.trimIndent()
+    }
+    
+    // ===== MÉTHODES MULTI-TENANT =====
+    
+    /**
+     * Envoie un email d'invitation à rejoindre un tenant
+     */
+    fun sendTenantInvitationEmail(
+        to: String,
+        inviterName: String,
+        tenant: Tenant,
+        invitationToken: String,
+        role: String
+    ): Mono<Void> {
+        val fromName = getFromName(tenant)
+        val subject = "Invitation à rejoindre $fromName"
+        val invitationUrl = "https://${tenant.activeDomain}/invitation?token=$invitationToken"
+        
+        val message = buildInvitationEmailMessage(inviterName, tenant, invitationUrl, role)
+        
+        return sendEmailWithTenantBranding(to, subject, message, tenant)
+            .doOnSuccess {
+                logger.info("✅ Email d'invitation envoyé à $to pour le tenant ${tenant.name}")
+            }
+    }
+    
+    /**
+     * Envoie un email de bienvenue dans un tenant
+     */
+    fun sendTenantWelcomeEmail(
+        to: String,
+        userName: String,
+        tenant: Tenant,
+        role: String
+    ): Mono<Void> {
+        val fromName = getFromName(tenant)
+        val subject = "Bienvenue sur $fromName !"
+        
+        val message = buildTenantWelcomeMessage(userName, tenant, role)
+        
+        return sendEmailWithTenantBranding(to, subject, message, tenant)
+            .doOnSuccess {
+                logger.info("✅ Email de bienvenue envoyé à $to pour le tenant ${tenant.name}")
+            }
+    }
+    
+    /**
+     * Envoie un email de vérification avec branding du tenant
+     */
+    fun sendVerificationEmailWithTenant(
+        to: String,
+        code: String,
+        userName: String,
+        tenant: Tenant?
+    ): Mono<Void> {
+        return if (tenant != null) {
+            val fromName = getFromName(tenant)
+            val subject = "Vérification de votre adresse email - $fromName"
+            val message = buildVerificationEmailMessageWithTenant(code, userName, tenant)
+            sendEmailWithTenantBranding(to, subject, message, tenant)
+        } else {
+            sendVerificationEmail(to, code, userName)
+        }
+    }
+    
+    /**
+     * Envoie un email avec le branding du tenant
+     */
+    private fun sendEmailWithTenantBranding(
+        to: String,
+        subject: String,
+        content: String,
+        tenant: Tenant
+    ): Mono<Void> {
+        val fromName = getFromName(tenant)
+        val fromAddress = getFromAddress(tenant)
+        
+        logger.info("📮 [TENANT_EMAIL] Envoi avec branding tenant: $fromName <$fromAddress>")
+        
+        return Mono.fromCallable {
+            val message = SimpleMailMessage()
+            message.setFrom("$fromName <$fromAddress>")
+            message.setTo(to)
+            message.setSubject(subject)
+            message.setText(content)
+            
+            try {
+                mailSender.send(message)
+                logger.info("✅ [TENANT_EMAIL] Email envoyé avec succès")
+            } catch (e: MailException) {
+                logger.error("❌ [TENANT_EMAIL] Erreur lors de l'envoi", e)
+                throw RuntimeException("Impossible d'envoyer l'email", e)
+            }
+        }
+        .subscribeOn(Schedulers.boundedElastic())
+        .then()
+    }
+    
+    /**
+     * Récupère le nom d'expéditeur (tenant custom ou défaut)
+     */
+    private fun getFromName(tenant: Tenant?): String {
+        return tenant?.settings?.emailFromName 
+            ?: tenant?.name 
+            ?: emailProperties.fromName
+    }
+    
+    /**
+     * Récupère l'adresse email d'expéditeur (tenant custom ou défaut)
+     */
+    private fun getFromAddress(tenant: Tenant?): String {
+        return tenant?.settings?.emailFromAddress 
+            ?: emailProperties.fromAddress
+    }
+    
+    /**
+     * Construit le message d'invitation
+     */
+    private fun buildInvitationEmailMessage(
+        inviterName: String,
+        tenant: Tenant,
+        invitationUrl: String,
+        role: String
+    ): String {
+        val roleDisplayName = when (role.uppercase()) {
+            "OWNER" -> "Propriétaire"
+            "ADMIN" -> "Administrateur"
+            "MEMBER" -> "Membre"
+            "GUEST" -> "Invité"
+            else -> role
+        }
+        
+        return """
+            Bonjour,
+            
+            $inviterName vous invite à rejoindre ${tenant.name} !
+            
+            Vous avez été invité en tant que : $roleDisplayName
+            
+            Pour accepter cette invitation et créer votre compte, cliquez sur le lien ci-dessous :
+            
+            $invitationUrl
+            
+            Ce lien est valide pendant 7 jours.
+            
+            Si vous n'avez pas demandé cette invitation, vous pouvez ignorer cet email.
+            
+            Cordialement,
+            L'équipe ${getFromName(tenant)}
+        """.trimIndent()
+    }
+    
+    /**
+     * Construit le message de bienvenue dans un tenant
+     */
+    private fun buildTenantWelcomeMessage(
+        userName: String,
+        tenant: Tenant,
+        role: String
+    ): String {
+        val roleDisplayName = when (role.uppercase()) {
+            "OWNER" -> "Propriétaire"
+            "ADMIN" -> "Administrateur"
+            "MEMBER" -> "Membre"
+            "GUEST" -> "Invité"
+            else -> role
+        }
+        
+        return """
+            Bonjour $userName,
+            
+            Bienvenue sur ${tenant.name} !
+            
+            Votre compte a été créé avec succès.
+            
+            Vos informations :
+            - Rôle : $roleDisplayName
+            - Espace : ${tenant.name}
+            - URL : https://${tenant.activeDomain}
+            
+            Vous pouvez maintenant vous connecter et commencer à utiliser la plateforme.
+            
+            Si vous avez des questions, n'hésitez pas à contacter l'administrateur de votre espace.
+            
+            Bienvenue parmi nous !
+            
+            Cordialement,
+            L'équipe ${getFromName(tenant)}
+        """.trimIndent()
+    }
+    
+    /**
+     * Construit le message de vérification avec branding tenant
+     */
+    private fun buildVerificationEmailMessageWithTenant(
+        code: String,
+        userName: String,
+        tenant: Tenant
+    ): String {
+        return """
+            Bonjour $userName,
+            
+            Bienvenue sur ${tenant.name} !
+            
+            Pour vérifier votre adresse email et activer votre compte, veuillez utiliser le code de vérification suivant :
+            
+            Code : $code
+            
+            ⚠️ Ce code est valide pendant 10 minutes seulement.
+            
+            Si vous n'avez pas créé de compte, veuillez ignorer cet email.
+            
+            Cordialement,
+            L'équipe ${getFromName(tenant)}
         """.trimIndent()
     }
 }

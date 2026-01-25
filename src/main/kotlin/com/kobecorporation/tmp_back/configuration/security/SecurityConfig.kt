@@ -22,11 +22,18 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource
 /**
  * Configuration Spring Security pour WebFlux Reactive
  * 
- * Gestion des rôles :
- * - USER : Accès public sans authentification
- * - EMPLOYE : Interface de management (authentification requise)
- * - ADMIN : Gestion des employés et contenu (authentification requise)
- * - ROOT_ADMIN : Accès système complet (authentification requise)
+ * Architecture Multi-Tenant SaaS :
+ * - PLATFORM_ADMIN : Super admin qui gère tous les tenants
+ * - ROOT_ADMIN : Admin principal d'un tenant
+ * - ADMIN : Gestion des employés et contenu (au sein d'un tenant)
+ * - EMPLOYE : Interface de management (au sein d'un tenant)
+ * - USER : Utilisateur standard
+ * 
+ * TenantRole (au sein d'un tenant) :
+ * - OWNER : Propriétaire du tenant
+ * - ADMIN : Administrateur du tenant
+ * - MEMBER : Membre standard
+ * - GUEST : Accès limité
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -38,7 +45,8 @@ class SecurityConfig(
 
     // URLs configurables depuis application.properties
     @Value("\${app.frontend-url:}") private val frontendUrl: String,
-    @Value("\${app.allowed-origins:http://localhost:3000,http://localhost:5174}") private val allowedOrigins: String
+    @Value("\${app.allowed-origins:http://localhost:3000,http://localhost:5174}") private val allowedOrigins: String,
+    @Value("\${tenant.platform-domain:kobecorporation.com}") private val platformDomain: String
 ) {
 
     @Bean
@@ -56,9 +64,21 @@ class SecurityConfig(
             .securityContextRepository(jwtServerSecurityContextRepository)
             .authorizeExchange { exchanges ->
                 exchanges
-                    // ===== ROUTES PUBLIQUES (USER - Pas d'authentification) =====
-                    // Authentification
+                    // ===== ROUTES PUBLIQUES (Pas d'authentification) =====
+                    
+                    // Authentification classique
                     .pathMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
+                    .pathMatchers("/api/auth/verify-email", "/api/auth/resend-verification-code").permitAll()
+                    .pathMatchers("/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
+                    
+                    // === MULTI-TENANT : Routes publiques ===
+                    // Création de tenant (signup)
+                    .pathMatchers(HttpMethod.POST, "/api/tenants/signup").permitAll()
+                    // Vérification disponibilité slug
+                    .pathMatchers(HttpMethod.GET, "/api/tenants/check-slug/**").permitAll()
+                    // Accepter une invitation
+                    .pathMatchers(HttpMethod.GET, "/api/invitations/**").permitAll()
+                    .pathMatchers(HttpMethod.POST, "/api/invitations/*/accept").permitAll()
                     
                     // Health check et documentation
                     .pathMatchers("/actuator/health", "/health", "/actuator/info").permitAll()
@@ -81,37 +101,54 @@ class SecurityConfig(
                     .pathMatchers(HttpMethod.GET, "/api/users/username/**").permitAll()
                     .pathMatchers(HttpMethod.GET, "/api/users/{userId}/public").permitAll()
 
+                    // ===== ROUTES PLATFORM ADMIN (Super Admin Multi-Tenant) =====
+                    // Gestion de tous les tenants
+                    .pathMatchers("/api/platform/**").hasRole("PLATFORM_ADMIN")
+                    .pathMatchers("/api/platform/admin/**").hasRole("PLATFORM_ADMIN")
+                    .pathMatchers("/api/platform/tenants/**").hasRole("PLATFORM_ADMIN")
+                    .pathMatchers("/api/platform/stats/**").hasRole("PLATFORM_ADMIN")
+
+                    // ===== ROUTES TENANT (Authentifié + dans un tenant) =====
+                    // Informations du tenant courant
+                    .pathMatchers(HttpMethod.GET, "/api/tenants/me").authenticated()
+                    .pathMatchers(HttpMethod.PUT, "/api/tenants/me").authenticated()
+                    .pathMatchers(HttpMethod.PUT, "/api/tenants/me/domain").authenticated()
+                    // Membres du tenant
+                    .pathMatchers(HttpMethod.GET, "/api/tenants/me/members").authenticated()
+                    // Invitations (réservé aux admins du tenant - vérifié dans le controller)
+                    .pathMatchers("/api/tenants/me/invitations/**").authenticated()
+
                     // ===== ROUTES EMPLOYE (Interface de Management) =====
                     // Gestion du contenu (CRUD)
-                    .pathMatchers(HttpMethod.POST, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
-                    .pathMatchers(HttpMethod.PUT, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
-                    .pathMatchers(HttpMethod.DELETE, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
+                    .pathMatchers(HttpMethod.POST, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers(HttpMethod.PUT, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers(HttpMethod.DELETE, "/api/content/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
                     
                     // Gestion des produits/articles (CRUD)
-                    .pathMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
-                    .pathMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
-                    .pathMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
+                    .pathMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
                     
                     // Upload d'images (authentifié)
-                    .pathMatchers(HttpMethod.POST, "/api/uploads/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
-                    .pathMatchers(HttpMethod.DELETE, "/api/uploads/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN")
+                    .pathMatchers(HttpMethod.POST, "/api/uploads/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers(HttpMethod.DELETE, "/api/uploads/**").hasAnyRole("EMPLOYE", "ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
 
-                    // ===== ROUTES ADMIN (Gestion des Employés) =====
+                    // ===== ROUTES ADMIN (Gestion des Employés dans le tenant) =====
                     // Gestion des employés (création, modification, suppression)
-                    .pathMatchers("/api/admin/employees/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
-                    .pathMatchers("/api/admin/users/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
-                    .pathMatchers("/api/admin/stats/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
+                    .pathMatchers("/api/admin/employees/**").hasAnyRole("ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers("/api/admin/users/**").hasAnyRole("ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers("/api/admin/stats/**").hasAnyRole("ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
                     
                     // Promotion/rétrogradation des rôles
-                    .pathMatchers("/api/users/{userId}/role/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
+                    .pathMatchers("/api/users/{userId}/role/**").hasAnyRole("ADMIN", "ROOT_ADMIN", "PLATFORM_ADMIN")
 
-                    // ===== ROUTES ROOT_ADMIN (Configuration Système) =====
+                    // ===== ROUTES ROOT_ADMIN (Configuration du tenant) =====
                     // Gestion des ADMIN (création par ROOT_ADMIN uniquement)
-                    .pathMatchers("/api/root/admin/**").hasRole("ROOT_ADMIN")
-                    .pathMatchers("/api/root/system/**").hasRole("ROOT_ADMIN")
-                    .pathMatchers("/api/root/config/**").hasRole("ROOT_ADMIN")
+                    .pathMatchers("/api/root/admin/**").hasAnyRole("ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers("/api/root/system/**").hasAnyRole("ROOT_ADMIN", "PLATFORM_ADMIN")
+                    .pathMatchers("/api/root/config/**").hasAnyRole("ROOT_ADMIN", "PLATFORM_ADMIN")
 
-                    // ===== ROUTES UTILISATEUR AUTHENTIFIÉ (Tous rôles sauf USER) =====
+                    // ===== ROUTES UTILISATEUR AUTHENTIFIÉ =====
                     // Gestion du profil utilisateur
                     .pathMatchers("/api/users/me", "/api/users/me/**").authenticated()
                     .pathMatchers(HttpMethod.PUT, "/api/users/me/**").authenticated()
@@ -146,14 +183,24 @@ class SecurityConfig(
 
         println("🌐 CORS - Allowed Origins: $originsFromConfig")
         println("🌐 CORS - Frontend URL: $frontendUrl")
+        println("🌐 CORS - Platform Domain: $platformDomain")
 
         val configuration = CorsConfiguration().apply {
             // Utiliser les origins configurés (+ frontendUrl)
             allowedOrigins = originsFromConfig.toList()
+            
+            // Patterns pour les sous-domaines du platform domain (multi-tenant)
+            // Accepte tous les sous-domaines de kobecorporation.com
+            allowedOriginPatterns = listOf(
+                "https://*.${platformDomain}",
+                "http://*.${platformDomain}",
+                "http://localhost:*",           // Dev local
+                "http://127.0.0.1:*"            // Dev local
+            )
 
             allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
             allowedHeaders = listOf("*")
-            exposedHeaders = listOf("Authorization", "X-Total-Count")
+            exposedHeaders = listOf("Authorization", "X-Total-Count", "X-Tenant-ID", "X-Tenant-Error")
             allowCredentials = true
             maxAge = 3600
         }
