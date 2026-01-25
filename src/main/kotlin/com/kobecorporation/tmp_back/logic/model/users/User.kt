@@ -1,28 +1,60 @@
 package com.kobecorporation.tmp_back.logic.model.users
 
+import com.kobecorporation.tmp_back.logic.model.tenant.TenantRole
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.CompoundIndexes
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 import java.time.LocalDate
 
 /**
- * Modèle utilisateur avec support des rôles et authentification
+ * Modèle utilisateur avec support multi-tenant
  * 
- * Améliorations apportées :
- * - Refresh token stocké pour gérer les sessions
- * - Champs de tracking améliorés
- * - Support des rôles avec hiérarchie
+ * Architecture multi-tenant :
+ * - tenantId : Identifie le tenant auquel appartient l'utilisateur
+ *   - null = Platform Admin (accès à tous les tenants)
+ * - tenantRole : Rôle de l'utilisateur au sein de son tenant
+ * - role : Rôle global (pour compatibilité et platform admin)
+ * 
+ * Index composés pour garantir l'unicité par tenant :
+ * - (tenantId, email) : Un email unique par tenant
+ * - (tenantId, username) : Un username unique par tenant
  */
 @Document(collection = "users")
+@CompoundIndexes(
+    CompoundIndex(name = "tenant_email_idx", def = "{'tenantId': 1, 'email': 1}", unique = true),
+    CompoundIndex(name = "tenant_username_idx", def = "{'tenantId': 1, 'username': 1}", unique = true)
+)
 data class User(
     @Id
     val id: ObjectId = ObjectId(),
 
-    @Indexed(unique = true)
+    // ===== MULTI-TENANT =====
+    /**
+     * ID du tenant auquel appartient l'utilisateur
+     * null = Platform Admin (super admin sans tenant)
+     */
+    @Indexed
+    val tenantId: ObjectId? = null,
+    
+    /**
+     * Rôle de l'utilisateur au sein de son tenant
+     * OWNER, ADMIN, MEMBER, GUEST
+     */
+    val tenantRole: TenantRole = TenantRole.MEMBER,
+
+    // ===== IDENTIFIANTS =====
+    /**
+     * Username unique au sein du tenant
+     */
     val username: String,
-    @Indexed(unique = true)
+    
+    /**
+     * Email unique au sein du tenant
+     */
     val email: String,
     val password: String?,
 
@@ -32,6 +64,10 @@ data class User(
     val birthDate: LocalDate? = null,
     val gender: Gender? = null,
 
+    /**
+     * Rôle global (pour compatibilité et distinction platform admin)
+     * PLATFORM_ADMIN = Super admin qui gère tous les tenants
+     */
     val role: Role = Role.USER,
 
     val isActive: Boolean = true,
@@ -112,4 +148,32 @@ data class User(
      */
     val fullName: String
         get() = "$firstName $lastName"
+    
+    /**
+     * Vérifie si l'utilisateur est un Platform Admin (sans tenant)
+     */
+    fun isPlatformAdmin(): Boolean {
+        return tenantId == null && role == Role.PLATFORM_ADMIN
+    }
+    
+    /**
+     * Vérifie si l'utilisateur est propriétaire de son tenant
+     */
+    fun isTenantOwner(): Boolean {
+        return tenantRole == TenantRole.OWNER
+    }
+    
+    /**
+     * Vérifie si l'utilisateur peut gérer les membres de son tenant
+     */
+    fun canManageMembers(): Boolean {
+        return tenantRole.isAtLeast(TenantRole.ADMIN)
+    }
+    
+    /**
+     * Vérifie si l'utilisateur appartient à un tenant spécifique
+     */
+    fun belongsToTenant(otherTenantId: ObjectId): Boolean {
+        return tenantId == otherTenantId
+    }
 }
