@@ -1,14 +1,16 @@
-# 🚀 Template Spring Boot - API Backend
+# 🚀 Template Spring Boot - API Backend Multi-Tenant SaaS
 
-> **Template générique et réutilisable** pour créer rapidement des APIs Spring Boot avec MongoDB, JWT, et Docker pour vos nouveaux clients.
+> **Plateforme SaaS Multi-Tenant** avec Spring Boot, MongoDB, JWT, et Docker. Permet de gérer plusieurs organisations/clients sur une même instance.
 
 ## 📋 Table des matières
 
 - [Présentation](#présentation)
+- [Architecture Multi-Tenant](#architecture-multi-tenant)
 - [Fonctionnalités](#fonctionnalités)
 - [Prérequis](#prérequis)
 - [Installation Rapide](#installation-rapide)
 - [Configuration](#configuration)
+- [Configuration Multi-Tenant](#configuration-multi-tenant)
 - [Démarrage](#démarrage)
 - [Tests de l'API](#tests-de-lapi)
 - [Architecture](#architecture)
@@ -16,22 +18,89 @@
 - [Développement](#développement)
 - [Production](#production)
 - [Dépannage](#dépannage)
+- [TODO - Configuration Avancée](#todo---configuration-avancée)
 
 ---
 
 ## 🎯 Présentation
 
-Ce template est conçu pour **accélérer le démarrage de nouveaux projets clients**. Il fournit une base solide avec :
+Cette plateforme est conçue comme un **SaaS Multi-Tenant** permettant à plusieurs organisations de partager la même instance. Elle fournit une base solide avec :
 
 - ✅ **Spring Boot 4.0** avec **Kotlin 2.2**
 - ✅ **WebFlux Reactive** (non-bloquant)
 - ✅ **MongoDB** (Reactive) avec authentification
 - ✅ **Spring Security** avec **JWT** (Access + Refresh Token)
+- ✅ **Architecture Multi-Tenant** (isolation par `tenantId`)
 - ✅ **Docker & Docker Compose** (prêt pour la production)
 - ✅ **Gestion des fichiers** (images users/stock)
-- ✅ **4 rôles utilisateurs** : USER, EMPLOYE, ADMIN, ROOT_ADMIN
-- ✅ **CORS configuré**
+- ✅ **Système de rôles** : PLATFORM_ADMIN, ROOT_ADMIN, ADMIN, EMPLOYE, USER
+- ✅ **Rôles Tenant** : OWNER, ADMIN, MEMBER, GUEST
+- ✅ **CORS configuré** (support domaines custom)
 - ✅ **Swagger/OpenAPI** intégré
+
+---
+
+## 🏢 Architecture Multi-Tenant
+
+### Concept
+
+L'application permet à **plusieurs organisations (tenants)** de coexister sur la même plateforme :
+
+```
+                    PLATEFORME SAAS
+    ┌─────────────────────────────────────────────┐
+    │                                             │
+    │  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+    │  │ Tenant A │  │ Tenant B │  │ Tenant C │  │
+    │  │ (Acme)   │  │ (Demo)   │  │ (Client) │  │
+    │  └──────────┘  └──────────┘  └──────────┘  │
+    │                                             │
+    │       Base de données partagée              │
+    │       (Isolation par tenantId)              │
+    └─────────────────────────────────────────────┘
+```
+
+### Stratégie de Domaines
+
+| Type | Pattern | Exemple |
+|------|---------|---------|
+| **Domaine par défaut** | `kb-saas-{slug}.kobecorporation.com` | `kb-saas-acme.kobecorporation.com` |
+| **Domaine custom** | `{domaine-client}` | `app.cliententreprise.fr` |
+| **Header (tests)** | `X-Tenant-ID: {tenantId}` | Pour Postman, tests API |
+
+### Hiérarchie des Rôles
+
+```
+RÔLES GLOBAUX                    RÔLES TENANT
+┌─────────────────────┐          ┌─────────────────────┐
+│ PLATFORM_ADMIN      │ ───────► │ Gère TOUS les       │
+│ (Super Admin)       │          │ tenants             │
+│ tenantId = null     │          │                     │
+└─────────────────────┘          └─────────────────────┘
+
+┌─────────────────────┐          ┌─────────────────────┐
+│ ROOT_ADMIN          │ ───────► │ OWNER               │
+│ (Admin du tenant)   │          │ Propriétaire        │
+├─────────────────────┤          ├─────────────────────┤
+│ ADMIN               │ ───────► │ ADMIN               │
+│ (Gestion équipe)    │          │ Administrateur      │
+├─────────────────────┤          ├─────────────────────┤
+│ EMPLOYE             │ ───────► │ MEMBER              │
+│ (Management)        │          │ Membre standard     │
+├─────────────────────┤          ├─────────────────────┤
+│ USER                │ ───────► │ GUEST               │
+│ (Utilisateur)       │          │ Accès limité        │
+└─────────────────────┘          └─────────────────────┘
+```
+
+### Plans Disponibles
+
+| Plan | Max Users | Stockage | Prix/mois | Fonctionnalités |
+|------|-----------|----------|-----------|-----------------|
+| **FREE** | 5 | 100 MB | 0€ | Support basique |
+| **STARTER** | 25 | 1 GB | 29€ | + Custom Branding |
+| **PRO** | 100 | 10 GB | 99€ | + API Access, Analytics |
+| **ENTERPRISE** | Illimité | 100 GB | 299€ | + SSO, Support prioritaire |
 
 ---
 
@@ -48,12 +117,13 @@ Ce template est conçu pour **accélérer le démarrage de nouveaux projets clie
 
 ### 👥 Gestion des Utilisateurs
 
-- **4 rôles hiérarchiques** :
+- **5 rôles hiérarchiques** :
   - `USER` : Utilisateur public (accès sans authentification)
   - `EMPLOYE` : Employé (accès interface de management)
   - `ADMIN` : Administrateur (gestion des employés et contenu)
-  - `ROOT_ADMIN` : Root Admin (accès complet système)
-- **Compte ROOT_ADMIN** créé automatiquement au démarrage
+  - `ROOT_ADMIN` : Root Admin (accès complet tenant)
+  - `PLATFORM_ADMIN` : Super Admin (gestion de tous les tenants)
+- **Compte PLATFORM_ADMIN** créé automatiquement au démarrage
 - **Verrouillage de compte** après tentatives échouées
 - **Vérification d'email obligatoire** : Code à 6 chiffres envoyé par email lors de l'inscription
 - **Réinitialisation de mot de passe** : Lien sécurisé envoyé par email
@@ -432,23 +502,24 @@ curl -X POST http://localhost:8090/api/auth/login \
 }
 ```
 
-### 4. Connexion ROOT_ADMIN
+### 4. Connexion PLATFORM_ADMIN
 
-Au premier démarrage, un compte ROOT_ADMIN est créé automatiquement :
+Au premier démarrage, un compte PLATFORM_ADMIN (super admin multi-tenant) est créé automatiquement :
 
 ```bash
 curl -X POST http://localhost:8090/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "emailOrUsername": "bendjibril789@gmail.com",
-    "password": "Root@dmin789!"
+    "emailOrUsername": "admin@kobecorporation.com",
+    "password": "Platform@dmin789!"
   }'
 ```
 
 **Identifiants par défaut** :
-- **Email** : `bendjibril789@gmail.com`
-- **Password** : `Root@dmin789!`
-- **Username** : `azerty-78`
+- **Email** : `admin@kobecorporation.com`
+- **Password** : `Platform@dmin789!`
+- **Username** : `platform-admin`
+- **Rôle** : `PLATFORM_ADMIN` (gère tous les tenants)
 
 ### 5. Rafraîchissement de Token
 
@@ -550,26 +621,40 @@ tmp-back/
 │   ├── TmpBackApplication.kt          # Point d'entrée
 │   │
 │   ├── logic/                          # Couche logique métier
-│   │   ├── model/users/               # Modèles (User, Role, Gender)
-│   │   ├── repository/users/          # Repositories MongoDB (Reactive)
-│   │   └── service/users/             # Services métier (AuthService)
+│   │   ├── model/
+│   │   │   ├── users/                 # Modèles (User, Role, Gender)
+│   │   │   └── tenant/                # Modèles Multi-Tenant (Tenant, TenantRole, etc.)
+│   │   ├── repository/
+│   │   │   ├── users/                 # Repositories Users
+│   │   │   ├── tenant/                # Repositories Tenant
+│   │   │   └── base/                  # TenantAwareRepository
+│   │   └── service/
+│   │       ├── users/                 # Services Users (AuthService)
+│   │       ├── tenant/                # Services Tenant (TenantService, InvitationService)
+│   │       └── email/                 # EmailService (avec branding tenant)
 │   │
 │   ├── interaction/                    # Couche d'interaction
-│   │   ├── dto/users/                 # DTOs (Request/Response)
+│   │   ├── dto/
+│   │   │   ├── users/                 # DTOs Users
+│   │   │   └── tenant/                # DTOs Tenant (Request/Response)
 │   │   ├── mapper/users/              # Mappers Entity ↔ DTO
 │   │   └── exception/                 # Exceptions personnalisées
 │   │
-│   ├── controller/users/               # Controllers REST
+│   ├── controller/
+│   │   ├── users/                     # Controllers Users
+│   │   ├── tenant/                    # TenantController, InvitationController
+│   │   └── platform/                  # PlatformAdminController
 │   │
 │   ├── configuration/                  # Configuration Spring
-│   │   ├── security/                  # Security, JWT
-│   │   ├── fileStorage/                # Configuration stockage fichiers
-│   │   └── MongoConfig.kt              # Configuration MongoDB
+│   │   ├── security/                  # Security, JWT, DataInitializer
+│   │   ├── tenant/                    # TenantContext, TenantWebFilter, TenantProperties
+│   │   ├── fileStorage/               # Configuration stockage fichiers
+│   │   └── MongoConfig.kt             # Configuration MongoDB
 │   │
 │   └── util/                           # Utilitaires
 │
 ├── src/main/resources/
-│   ├── application.properties          # Configuration par défaut
+│   ├── application.properties          # Configuration par défaut + Multi-Tenant
 │   ├── application-ngrok.properties    # Configuration ngrok
 │   └── application-prod.properties     # Configuration production
 │
@@ -577,18 +662,23 @@ tmp-back/
 │   ├── docker-compose.yaml
 │   ├── .env
 │   └── init-scripts/
-│       └── 01-init-database.js         # Script d'initialisation DB
+│       └── 01-init-database.js
 │
 ├── setup-api/                          # Configuration API Docker
-│   ├── docker-compose.yaml
+│   ├── docker-compose.yaml            # + Variables Multi-Tenant
 │   ├── Dockerfile
+│   └── .env                           # + Platform Admin + Tenant Config
+│
+├── setup-smtp/                         # Configuration MailHog (tests email)
+│   ├── docker-compose.yaml
 │   └── .env
 │
-├── scripts/                            # Scripts d'automatisation
-│   ├── init-project.sh / .ps1         # Initialisation projet
-│   ├── start.sh / .ps1                 # Démarrage services
-│   └── stop.sh / .ps1                  # Arrêt services
+├── setup-proxy/                        # 🆕 Traefik Reverse Proxy (Production)
+│   ├── docker-compose.yaml            # Configuration Traefik
+│   ├── .env
+│   └── README.md                      # Documentation
 │
+├── scripts/                            # Scripts d'automatisation
 ├── Makefile                            # Commandes simplifiées
 ├── build.gradle.kts                    # Dépendances Gradle
 └── README.md                           # Ce fichier
@@ -866,6 +956,147 @@ app.email.from-name=${EMAIL_FROM_NAME:Nom de votre entreprise}
 4. **Déployer en production** :
    - Les variables d'environnement dans `setup-api/.env` seront utilisées automatiquement
    - L'application utilisera le vrai serveur SMTP
+
+---
+
+---
+
+## 🏢 Configuration Multi-Tenant
+
+### Variables d'Environnement
+
+Dans `setup-api/.env` ou `application.properties` :
+
+```env
+# Domaine principal de la plateforme
+TENANT_PLATFORM_DOMAIN=kobecorporation.com
+
+# Préfixe pour les sous-domaines (kb-saas-{slug}.kobecorporation.com)
+TENANT_SUBDOMAIN_PREFIX=kb-saas-
+
+# Header HTTP pour identifier le tenant (tests/API)
+TENANT_HEADER_NAME=X-Tenant-ID
+
+# Plan par défaut pour les nouveaux tenants
+TENANT_DEFAULT_PLAN=FREE
+
+# Nombre de jours d'essai gratuit
+TENANT_TRIAL_DAYS=14
+
+# Nombre max de tenants qu'un utilisateur peut créer
+TENANT_MAX_PER_USER=3
+
+# Platform Admin (Super Admin Multi-Tenant)
+PLATFORM_ADMIN_EMAIL=admin@kobecorporation.com
+PLATFORM_ADMIN_PASSWORD=Platform@dmin789!
+```
+
+### Endpoints Multi-Tenant
+
+#### Routes Publiques (Pas d'authentification)
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/api/tenants/signup` | Créer un nouveau tenant + owner |
+| GET | `/api/tenants/check-slug/{slug}` | Vérifier disponibilité du slug |
+| GET | `/api/invitations/{token}` | Infos d'une invitation |
+| POST | `/api/invitations/{token}/accept` | Accepter une invitation |
+
+#### Routes Tenant (Authentifié + dans un tenant)
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/api/tenants/me` | Informations du tenant courant |
+| PUT | `/api/tenants/me` | Mettre à jour le tenant (ADMIN+) |
+| PUT | `/api/tenants/me/domain` | Configurer un domaine custom (OWNER) |
+| GET | `/api/tenants/me/members` | Liste des membres |
+| POST | `/api/tenants/me/invitations` | Créer une invitation (ADMIN+) |
+| GET | `/api/tenants/me/invitations` | Liste des invitations |
+
+#### Routes Platform Admin (PLATFORM_ADMIN uniquement)
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/api/platform/admin/tenants` | Liste tous les tenants |
+| GET | `/api/platform/admin/tenants/{id}` | Détails d'un tenant |
+| PUT | `/api/platform/admin/tenants/{id}/status` | Changer le statut |
+| DELETE | `/api/platform/admin/tenants/{id}` | Supprimer un tenant |
+| GET | `/api/platform/admin/stats` | Statistiques globales |
+
+### Test avec Header X-Tenant-ID
+
+Pour tester en développement sans configurer les domaines :
+
+```bash
+# Récupérer l'ID du tenant (ObjectId MongoDB)
+# Puis l'utiliser dans les requêtes :
+
+curl -X GET http://localhost:8090/api/tenants/me \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "X-Tenant-ID: 507f1f77bcf86cd799439011"
+```
+
+### Créer un Tenant (Exemple)
+
+```bash
+curl -X POST http://localhost:8090/api/tenants/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Ma Startup",
+    "slug": "ma-startup",
+    "ownerEmail": "owner@ma-startup.com",
+    "ownerPassword": "Password123!",
+    "ownerFirstName": "Jean",
+    "ownerLastName": "Dupont",
+    "ownerUsername": "jean-dupont"
+  }'
+```
+
+---
+
+## 📌 TODO - Configuration Avancée
+
+### 🔲 Reverse Proxy (Production)
+
+> **Status** : À configurer plus tard pour la production
+
+Le dossier `setup-proxy/` contient une configuration Traefik prête à l'emploi pour :
+
+- ✅ Gérer les domaines custom des tenants (`*.kobecorporation.com` + domaines clients)
+- ✅ SSL/HTTPS automatique avec Let's Encrypt
+- ✅ Load balancing si plusieurs instances de l'API
+
+**Fichiers :**
+```
+setup-proxy/
+├── docker-compose.yaml   # Configuration Traefik
+├── .env                  # Variables d'environnement
+└── README.md             # Documentation
+```
+
+**Pour activer (production) :**
+1. Configurer le DNS wildcard `*.kobecorporation.com → IP_SERVEUR`
+2. Modifier `setup-proxy/.env` avec votre email Let's Encrypt
+3. Décommenter les labels Traefik dans `setup-api/docker-compose.yaml`
+4. Lancer : `cd setup-proxy && docker-compose up -d`
+
+### 🔲 Redis (Optionnel)
+
+Pour améliorer les performances :
+- Cache des sessions
+- Rate limiting
+- Cache des résolutions de tenant
+
+### 🔲 Intégration Stripe (Optionnel)
+
+Les champs sont prêts dans le modèle Tenant :
+- `stripeCustomerId`
+- `stripeSubscriptionId`
+
+À intégrer pour :
+- Paiement des abonnements
+- Upgrade/downgrade de plan
+- Facturation automatique
 
 ---
 
