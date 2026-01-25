@@ -1,5 +1,6 @@
 package com.kobecorporation.tmp_back.configuration.security.jwt
 
+import com.kobecorporation.tmp_back.logic.model.tenant.TenantRole
 import com.kobecorporation.tmp_back.logic.model.users.Role
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
@@ -13,6 +14,10 @@ import java.util.Base64
 
 /**
  * Service pour la génération et validation des tokens JWT
+ * 
+ * Architecture multi-tenant :
+ * - Access Token contient : userId, email, role, tenantId, tenantRole
+ * - Refresh Token contient : userId, tenantId, rememberMe
  * 
  * Gère :
  * - Access Token : Durée courte (15 min recommandé)
@@ -29,28 +34,59 @@ class JwtService(
 
     /**
      * Génère un Access Token (durée courte)
+     * Inclut les informations du tenant pour l'architecture multi-tenant
+     * 
+     * @param tenantId null pour les Platform Admin
+     * @param tenantRole rôle au sein du tenant
      */
-    fun generateAccessToken(userId: ObjectId, email: String, role: Role): String {
+    fun generateAccessToken(
+        userId: ObjectId, 
+        email: String, 
+        role: Role,
+        tenantId: ObjectId? = null,
+        tenantRole: TenantRole = TenantRole.MEMBER
+    ): String {
         val now = Instant.now()
         val expiryDate = Date.from(now.plusMillis(jwtProperties.accessTokenExpiration))
 
-        return Jwts.builder()
+        val builder = Jwts.builder()
             .subject(userId.toHexString())
             .claim("email", email)
             .claim("role", role.name)
+            .claim("tenantRole", tenantRole.name)
             .claim("type", "ACCESS")
             .issuedAt(Date.from(now))
             .expiration(expiryDate)
-            .signWith(secretKey)
-            .compact()
+        
+        // Ajouter tenantId seulement s'il existe (null pour Platform Admin)
+        if (tenantId != null) {
+            builder.claim("tenantId", tenantId.toHexString())
+        }
+        
+        return builder.signWith(secretKey).compact()
+    }
+    
+    /**
+     * Surcharge pour compatibilité avec l'ancien code
+     * @deprecated Utiliser la version avec tenantId et tenantRole
+     */
+    @Deprecated("Utiliser generateAccessToken avec tenantId et tenantRole")
+    fun generateAccessToken(userId: ObjectId, email: String, role: Role): String {
+        return generateAccessToken(userId, email, role, null, TenantRole.MEMBER)
     }
 
     /**
      * Génère un Refresh Token (durée longue)
      * Le refresh token sera stocké dans User.refreshToken
      * Renouvelé toutes les heures après utilisation
+     * 
+     * @param tenantId inclus pour valider que le refresh est pour le bon tenant
      */
-    fun generateRefreshToken(userId: ObjectId, rememberMe: Boolean = false): String {
+    fun generateRefreshToken(
+        userId: ObjectId, 
+        rememberMe: Boolean = false,
+        tenantId: ObjectId? = null
+    ): String {
         val now = Instant.now()
         val expirationMillis = if (rememberMe) {
             jwtProperties.rememberMeRefreshTokenExpiration
@@ -59,14 +95,27 @@ class JwtService(
         }
         val expiryDate = Date.from(now.plusMillis(expirationMillis))
 
-        return Jwts.builder()
+        val builder = Jwts.builder()
             .subject(userId.toHexString())
             .claim("type", "REFRESH")
             .claim("rememberMe", rememberMe)
             .issuedAt(Date.from(now))
             .expiration(expiryDate)
-            .signWith(secretKey)
-            .compact()
+        
+        // Ajouter tenantId pour validation lors du refresh
+        if (tenantId != null) {
+            builder.claim("tenantId", tenantId.toHexString())
+        }
+        
+        return builder.signWith(secretKey).compact()
+    }
+    
+    /**
+     * Surcharge pour compatibilité
+     */
+    @Deprecated("Utiliser generateRefreshToken avec tenantId")
+    fun generateRefreshToken(userId: ObjectId, rememberMe: Boolean = false): String {
+        return generateRefreshToken(userId, rememberMe, null)
     }
 
     /**
@@ -105,6 +154,34 @@ class JwtService(
     fun extractRole(token: String): Role {
         val roleName = extractAllClaims(token)["role"] as String
         return Role.fromString(roleName) ?: Role.USER
+    }
+    
+    /**
+     * Extrait l'ID du tenant depuis le token
+     * Retourne null pour les Platform Admin (pas de tenant)
+     */
+    fun extractTenantId(token: String): ObjectId? {
+        val claims = extractAllClaims(token)
+        val tenantIdStr = claims["tenantId"] as? String
+        return tenantIdStr?.let { ObjectId(it) }
+    }
+    
+    /**
+     * Extrait le rôle tenant depuis le token
+     */
+    fun extractTenantRole(token: String): TenantRole {
+        val claims = extractAllClaims(token)
+        val tenantRoleName = claims["tenantRole"] as? String
+        return tenantRoleName?.let { 
+            try { TenantRole.valueOf(it) } catch (e: Exception) { TenantRole.MEMBER }
+        } ?: TenantRole.MEMBER
+    }
+    
+    /**
+     * Vérifie si le token appartient à un Platform Admin (pas de tenantId)
+     */
+    fun isPlatformAdmin(token: String): Boolean {
+        return extractTenantId(token) == null && extractRole(token) == Role.PLATFORM_ADMIN
     }
 
     /**
